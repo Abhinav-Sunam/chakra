@@ -2,7 +2,6 @@
 
 import numpy as np
 import pytest
-
 from app.sim.conditions import (
     ConditionModel,
     FailParams,

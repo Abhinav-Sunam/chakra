@@ -3,6 +3,7 @@ Follows docs/SPEC.md §12 and validates all outgoing messages against backend/ap
 """
 
 import asyncio
+import json
 import math
 import random
 import time
@@ -503,11 +504,83 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_text(AckResponse(id=cmd_id).model_dump_json())
             elif cmd == "preview_orbit":
                 sat_id = int(args.get("id", 0))
-                track = []
-                for step in range(0, 5700, 150):
-                    p_lat, p_lon, _, _ = mock_sim.get_sat_pos(sat_id, mock_sim.t + step)
-                    track.append((round(p_lon, 2), round(p_lat, 2)))
-                await websocket.send_text(OrbitPreviewResponse(id=sat_id, track=track).model_dump_json())
+                target_lat = float(args.get("lat", 0.0))
+                target_lon = float(args.get("lon", 0.0))
+                inc_deg = float(args.get("inc_deg", 53.0))
+                period_s = 5730.0
+
+                # Return a 190-point ground track starting at target
+                track: List[List[float]] = []
+                for step in range(190):
+                    t_offset = step * 30.0
+                    u = t_offset * (2 * math.pi / period_s)
+                    lat = target_lat * math.cos(u) + (inc_deg if abs(target_lat) < 5 else target_lat) * math.sin(u) * 0.3
+                    lat = max(-85.0, min(85.0, lat))
+                    lon = ((target_lon + (t_offset / period_s) * 360.0 - (t_offset * 360.0 / 86400.0) + 180.0) % 360.0) - 180.0
+                    track.append([round(lon, 3), round(lat, 3)])
+
+                await websocket.send_text(
+                    OrbitPreviewResponse(
+                        id=sat_id,
+                        inc_deg=round(inc_deg, 1),
+                        period_s=round(period_s, 1),
+                        track=track,
+                    ).model_dump_json()
+                )
+            elif cmd == "preview_impact":
+                sat_id = int(args.get("id", 0))
+                # Random plausible latencyDeltaMs and affectedFlows
+                delta = round(random.uniform(-4.5, 3.0), 2)
+                flows_count = random.randint(1, 4)
+                await websocket.send_text(
+                    json.dumps({
+                        "type": "impact_preview",
+                        "id": sat_id,
+                        "latencyDeltaMs": delta,
+                        "affectedFlows": flows_count,
+                    })
+                )
+            elif cmd == "add_sat":
+                lat = float(args.get("lat", 0.0))
+                lon = float(args.get("lon", 0.0))
+                new_id = len(mock_sim.sat_status)
+                mock_sim.sat_status.append(0)
+                mock_sim.events.append(
+                    SimEvent(
+                        t=round(mock_sim.t, 2),
+                        level="info",
+                        kind="add_sat",
+                        msg=f"Satellite S{new_id:03d} injected at ({lat:.1f}, {lon:.1f})",
+                    )
+                )
+                await websocket.send_text(AckResponse(id=cmd_id).model_dump_json())
+            elif cmd == "remove_sat":
+                sat_id = int(args.get("id", 0))
+                if 0 <= sat_id < len(mock_sim.sat_status):
+                    mock_sim.sat_status[sat_id] = 1  # mark down/removed
+                    mock_sim.events.append(
+                        SimEvent(
+                            t=round(mock_sim.t, 2),
+                            level="warn",
+                            kind="remove_sat",
+                            msg=f"Satellite S{sat_id:03d} decommissioned",
+                        )
+                    )
+                await websocket.send_text(AckResponse(id=cmd_id).model_dump_json())
+            elif cmd == "pin_sat":
+                sat_id = int(args.get("id", 0))
+                pinned = bool(args.get("pinned", True))
+                if 0 <= sat_id < len(mock_sim.sat_status):
+                    mock_sim.sat_status[sat_id] = 3 if pinned else 0
+                    mock_sim.events.append(
+                        SimEvent(
+                            t=round(mock_sim.t, 2),
+                            level="info",
+                            kind="pin_sat",
+                            msg=f"Satellite S{sat_id:03d} {'pinned (GEO relay)' if pinned else 'unpinned'}",
+                        )
+                    )
+                await websocket.send_text(AckResponse(id=cmd_id).model_dump_json())
             else:
                 await websocket.send_text(AckResponse(id=cmd_id).model_dump_json())
 

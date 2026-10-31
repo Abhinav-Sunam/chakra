@@ -179,7 +179,6 @@ class AdaptiveRouter:
                 max_rho_seen = 0.0
                 for p_prev, _ in prev_flow_routes:
                     for idx in range(len(p_prev) - 1):
-                        k_p = link_key(p_prev[idx], p_prev[idx + 1])
                         if G.has_edge(p_prev[idx], p_prev[idx + 1]):
                             e_d = G[p_prev[idx]][p_prev[idx + 1]]
                             cap = e_d["capacity"]

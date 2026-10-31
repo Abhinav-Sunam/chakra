@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
@@ -26,6 +26,7 @@ from app.sim.routing import (
     AdaptiveRouter,
     StaticRouter,
 )
+from app.sim.scenarios import Scenario, ScenarioEvent, load_scenario
 from app.sim.topology import (
     GroundStation,
     Topology,
@@ -146,6 +147,11 @@ class Engine:
         self.event_buffer: List[Dict[str, Any]] = []
         self.all_events: List[Dict[str, Any]] = []
 
+        # 9. Scenario playback state
+        self.active_scenario: Optional[Scenario] = None
+        self.scenario_queue: List[ScenarioEvent] = []
+        self.scenario_t_offset: float = 0.0  # sim-time when scenario started
+
         # 9. Initial topology and evaluation at t = 0
         pos0 = positions_ecef(self.constellation, 0.0)
         self.last_pos = pos0
@@ -198,6 +204,9 @@ class Engine:
         """
         t_start = time.perf_counter()
         self.t += sim_dt
+
+        # Dispatch pending scenario events whose time has arrived
+        self._dispatch_scenario_events()
 
         # Update satellite orbital positions
         pos = self._get_sat_positions(self.t)
@@ -335,6 +344,34 @@ class Engine:
     def snapshot(self) -> Dict[str, Any]:
         """Return frame dictionary snapshot without advancing simulation time."""
         return self._build_frame(clear_events=False)
+
+    def _dispatch_scenario_events(self) -> None:
+        """Fire any pending scenario events whose scheduled time has arrived."""
+        if not self.scenario_queue:
+            return
+
+        scenario_t = self.t - self.scenario_t_offset
+        fired: List[int] = []
+        for idx, evt in enumerate(self.scenario_queue):
+            if scenario_t >= evt.t:
+                # Fire this scenario event as a command
+                try:
+                    self.apply_command(evt.cmd, evt.args)
+                except Exception:
+                    pass  # scenario events are best-effort
+                log_evt = {
+                    "t": self.t,
+                    "level": "info",
+                    "kind": "scenario",
+                    "msg": f"Scenario event: {evt.cmd} at scenario t={evt.t:.1f}s",
+                }
+                self.event_buffer.append(log_evt)
+                self.all_events.append(log_evt)
+                fired.append(idx)
+
+        # Remove fired events (iterate in reverse to preserve indices)
+        for idx in reversed(fired):
+            self.scenario_queue.pop(idx)
 
     def _build_frame(self, clear_events: bool = True) -> Dict[str, Any]:
         """Build frame dictionary matching SPEC section 12 exact structure."""
@@ -866,6 +903,31 @@ class Engine:
             self._base_mbps.pop(f_id, None)
             self._force_adaptive = True
             return None
+
+        elif cmd_lower == "load_scenario":
+            name = str(args.get("name", ""))
+            scenario = load_scenario(name)
+            if scenario is None:
+                raise ValueError(f"Scenario not found: {name}")
+            # Reset engine state first
+            self._init_state()
+            # Apply config overrides
+            if scenario.config_overrides:
+                for k, v in scenario.config_overrides.items():
+                    self.config[k] = v
+            # Queue scenario events sorted by time
+            self.active_scenario = scenario
+            self.scenario_queue = sorted(scenario.events, key=lambda e: e.t)
+            self.scenario_t_offset = self.t  # scenario clock starts from current sim time
+            evt = {
+                "t": self.t,
+                "level": "info",
+                "kind": "scenario",
+                "msg": f"Scenario '{scenario.title}' loaded with {len(scenario.events)} events over {scenario.duration_s}s",
+            }
+            self.event_buffer.append(evt)
+            self.all_events.append(evt)
+            return [evt]
 
         else:
             raise ValueError(f"Unknown command: {cmd}")

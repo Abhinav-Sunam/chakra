@@ -2,19 +2,15 @@
 
 import math
 import time
-from typing import Dict, Tuple
+from typing import Tuple
 
 import numpy as np
-import pytest
-
 from app.sim.conditions import ConditionModel, FailParams, link_key
 from app.sim.linkmath import link_latency_ms, prop_ms, queue_ms, survive
 from app.sim.orbit import positions_ecef, walker_delta
 from app.sim.topology import Topology, build_topology, default_ground_stations
 from app.sim.traffic import (
-    EvalResult,
     Flow,
-    FlowEval,
     default_flows,
     evaluate,
 )

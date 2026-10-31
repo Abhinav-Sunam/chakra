@@ -1,0 +1,10 @@
+{
+  "name": "calm_baseline",
+  "title": "Calm Baseline",
+  "description": "Nominal operations showing steady-state constellation dynamics and routing.",
+  "duration_s": 300,
+  "seed": 42,
+  "config_overrides": {},
+  "events": []
+}
+

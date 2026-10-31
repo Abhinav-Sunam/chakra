@@ -2,11 +2,9 @@
 
 import numpy as np
 import pytest
-
-from app.sim.constants import R_EARTH
 from app.sim.engine import Engine
 from app.sim.orbit import ground_track, in_shadow, propagate_eci, walker_delta
-from app.sim.tle import parse_tle_file, TLEConstellation
+from app.sim.tle import TLEConstellation, parse_tle_file
 
 
 def test_add_remove_stable_ids():
@@ -93,7 +91,11 @@ def test_eclipse_fraction():
 
 def test_tle_parsing_and_propagation():
     """Verify TLE sample file parsing and SGP4 propagation."""
-    sats = parse_tle_file("data/starlink_sample.tle")
+    import os
+    tle_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "starlink_sample.tle")
+    if not os.path.exists(tle_path):
+        pytest.skip("TLE sample file not found")
+    sats = parse_tle_file(tle_path)
     assert len(sats) == 10
 
     const = TLEConstellation(sats)

@@ -1,0 +1,21 @@
+{
+  "name": "flash_crowd",
+  "title": "Flash Crowd Surge",
+  "description": "Traffic hotspots erupt with 4x demand surge on Delhi and London ground stations for 4 minutes.",
+  "duration_s": 300,
+  "seed": 42,
+  "config_overrides": {},
+  "events": [
+    {
+      "t": 30.0,
+      "cmd": "set_hotspot",
+      "args": { "gs_id": 120, "factor": 4.0, "duration_s": 240.0 }
+    },
+    {
+      "t": 30.0,
+      "cmd": "set_hotspot",
+      "args": { "gs_id": 121, "factor": 4.0, "duration_s": 240.0 }
+    }
+  ]
+}
+

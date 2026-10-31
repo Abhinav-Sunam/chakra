@@ -2,7 +2,6 @@
 
 import numpy as np
 import pytest
-
 from app.sim.linkmath import (
     GSL_CAPACITY_MBPS,
     ISL_CAPACITY_MBPS,

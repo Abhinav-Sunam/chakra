@@ -1,7 +1,5 @@
 """Unit tests for Phase M4: Routing v2 (Predictive, dynamic splitting, explanations, weight presets)."""
 
-import numpy as np
-import pytest
 
 from app.sim.engine import Engine
 

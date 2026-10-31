@@ -1,14 +1,10 @@
 """Unit tests for GSL topology construction in backend/app/sim/topology.py."""
 
 import time
-import numpy as np
-import pytest
 
-from app.sim.constants import GSL_DROP_MARGIN_DEG, GSL_EL_MIN_DEG, GSL_MAX_PER_STATION
 from app.sim.orbit import positions_ecef, walker_delta
 from app.sim.topology import (
     TopoParams,
-    build_gsl,
     build_topology,
     default_ground_stations,
     elevation_deg,
@@ -117,7 +113,7 @@ def test_5_gsl_station_counts_info():
     for sat_id, st_id in topo.gsl:
         station_counts[st_id] = station_counts.get(st_id, 0) + 1
 
-    print(f"\nGround station GSL connections at t=0:")
+    print("\nGround station GSL connections at t=0:")
     print(f"{'Station ID':<12} | {'Name':<15} | {'GSL Count':<10}")
     print("-" * 42)
     for st in ground:

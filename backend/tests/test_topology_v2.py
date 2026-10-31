@@ -1,10 +1,8 @@
 """Unit tests for Phase M2: Topology v2, plane/region failures, link TTL, and partition detection."""
 
-import numpy as np
-import pytest
 
 from app.sim.engine import Engine
-from app.sim.topology import link_ttl, TopoParams
+from app.sim.topology import link_ttl
 
 
 def test_fail_plane():

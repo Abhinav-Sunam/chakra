@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import os
-from typing import List, Optional, Tuple
+from typing import List, Optional
+
 import numpy as np
-from sgp4.api import Satrec, WGS72
-from sgp4.api import jday
+from sgp4.api import WGS72, Satrec
 
 from app.sim.constants import OMEGA_E, R_EARTH
-from app.sim.orbit import ecef_to_latlon
 
 
 class TLEConstellation:

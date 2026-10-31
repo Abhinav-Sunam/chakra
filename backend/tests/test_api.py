@@ -1,10 +1,9 @@
 """Integration tests for FastAPI REST and WebSocket endpoints."""
 
 import json
-import pytest
-from starlette.testclient import TestClient
 
-from app.main import app, engine
+from app.main import app
+from starlette.testclient import TestClient
 
 
 def test_1_health_and_state():

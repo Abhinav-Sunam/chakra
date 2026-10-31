@@ -1,0 +1,229 @@
+{
+  "scenario": "solar_storm",
+  "n_seeds": 2,
+  "duration_s": 60.0,
+  "sim_dt": 2.0,
+  "wall_time_s": 2.9,
+  "aggregate": {
+    "adaptive": {
+      "latMs": {
+        "mean": 0.0,
+        "std": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p95": 0.0
+      },
+      "pdr": {
+        "mean": 0.0,
+        "std": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p95": 0.0
+      },
+      "throughput_mbps": {
+        "mean": 478.3156,
+        "std": 0.0004,
+        "min": 478.3151,
+        "max": 478.316,
+        "p95": 478.3159
+      },
+      "reroutes": {
+        "mean": 1.0,
+        "std": 0.0,
+        "min": 1.0,
+        "max": 1.0,
+        "p95": 1.0
+      },
+      "proactive_reroutes": {
+        "mean": 0.0,
+        "std": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p95": 0.0
+      },
+      "reactive_reroutes": {
+        "mean": 1.0,
+        "std": 0.0,
+        "min": 1.0,
+        "max": 1.0,
+        "p95": 1.0
+      }
+    },
+    "static": {
+      "latMs": {
+        "mean": 0.0,
+        "std": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p95": 0.0
+      },
+      "pdr": {
+        "mean": 0.0,
+        "std": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p95": 0.0
+      },
+      "throughput_mbps": {
+        "mean": 478.3549,
+        "std": 0.0,
+        "min": 478.3549,
+        "max": 478.3549,
+        "p95": 478.3549
+      }
+    },
+    "tick_ms_p95": {
+      "mean": 51.4016,
+      "std": 0.3691,
+      "min": 51.0325,
+      "max": 51.7706,
+      "p95": 51.7337
+    },
+    "tick_ms_mean": {
+      "mean": 45.9729,
+      "std": 0.2591,
+      "min": 45.7139,
+      "max": 46.232,
+      "p95": 46.2061
+    }
+  },
+  "per_seed": [
+    {
+      "seed": 42,
+      "adaptive": {
+        "latMs_mean": 0.0,
+        "pdr_mean": 0.0,
+        "throughput_mbps": 478.3151472375368,
+        "reroutes": 1,
+        "proactive_reroutes": 0,
+        "reactive_reroutes": 1,
+        "avg_stretch": 1.0
+      },
+      "static": {
+        "latMs_mean": 0.0,
+        "pdr_mean": 0.0,
+        "throughput_mbps": 478.3549098184247,
+        "reroutes": 1
+      },
+      "network": {
+        "link_uptime": 99.63,
+        "active_failures": 26
+      },
+      "tick_ms_p95": 51.77060263813473,
+      "tick_ms_mean": 46.23198748255769,
+      "failure_events": 1,
+      "timeseries": [
+        {
+          "t": 2.0,
+          "adaptive_lat": 32.55,
+          "adaptive_pdr": 14.8,
+          "adaptive_thr": 382.31,
+          "static_lat": 34.23,
+          "static_pdr": 14.8,
+          "static_thr": 382.31
+        },
+        {
+          "t": 22.0,
+          "adaptive_lat": 30.16,
+          "adaptive_pdr": 14.81,
+          "adaptive_thr": 382.55,
+          "static_lat": 30.34,
+          "static_pdr": 14.81,
+          "static_thr": 382.57
+        },
+        {
+          "t": 42.0,
+          "adaptive_lat": 35.26,
+          "adaptive_pdr": 25.92,
+          "adaptive_thr": 669.81,
+          "static_lat": 35.3,
+          "static_pdr": 25.92,
+          "static_thr": 669.78
+        }
+      ]
+    },
+    {
+      "seed": 43,
+      "adaptive": {
+        "latMs_mean": 0.0,
+        "pdr_mean": 0.0,
+        "throughput_mbps": 478.315956803854,
+        "reroutes": 1,
+        "proactive_reroutes": 0,
+        "reactive_reroutes": 1,
+        "avg_stretch": 1.0
+      },
+      "static": {
+        "latMs_mean": 0.0,
+        "pdr_mean": 0.0,
+        "throughput_mbps": 478.3549098184247,
+        "reroutes": 1
+      },
+      "network": {
+        "link_uptime": 99.35,
+        "active_failures": 27
+      },
+      "tick_ms_p95": 51.03249785024672,
+      "tick_ms_mean": 45.71388167484353,
+      "failure_events": 3,
+      "timeseries": [
+        {
+          "t": 2.0,
+          "adaptive_lat": 32.55,
+          "adaptive_pdr": 14.8,
+          "adaptive_thr": 382.31,
+          "static_lat": 34.23,
+          "static_pdr": 14.8,
+          "static_thr": 382.31
+        },
+        {
+          "t": 22.0,
+          "adaptive_lat": 30.16,
+          "adaptive_pdr": 14.81,
+          "adaptive_thr": 382.55,
+          "static_lat": 30.34,
+          "static_pdr": 14.81,
+          "static_thr": 382.57
+        },
+        {
+          "t": 42.0,
+          "adaptive_lat": 35.27,
+          "adaptive_pdr": 25.92,
+          "adaptive_thr": 669.78,
+          "static_lat": 35.3,
+          "static_pdr": 25.92,
+          "static_thr": 669.78
+        }
+      ]
+    }
+  ],
+  "timeseries": [
+    {
+      "t": 2.0,
+      "adaptive_lat": 32.55,
+      "adaptive_pdr": 14.8,
+      "adaptive_thr": 382.31,
+      "static_lat": 34.23,
+      "static_pdr": 14.8,
+      "static_thr": 382.31
+    },
+    {
+      "t": 22.0,
+      "adaptive_lat": 30.16,
+      "adaptive_pdr": 14.81,
+      "adaptive_thr": 382.55,
+      "static_lat": 30.34,
+      "static_pdr": 14.81,
+      "static_thr": 382.57
+    },
+    {
+      "t": 42.0,
+      "adaptive_lat": 35.26,
+      "adaptive_pdr": 25.92,
+      "adaptive_thr": 669.81,
+      "static_lat": 35.3,
+      "static_pdr": 25.92,
+      "static_thr": 669.78
+    }
+  ]
+}

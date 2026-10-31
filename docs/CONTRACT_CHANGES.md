@@ -39,3 +39,15 @@ v1 contract frozen
      - `storms`: list of active storm cells `[{"id": str, "lat": float, "lon": float, "radius_km": float, "intensity": float}]`.
      - `flows[i].adaptive.explain`: `{"chosen_cost": float, "alt_cost": float, "reason": "failure"|"congestion"|"handover"|"prediction"|"init"|"steady", "detail": str}`.
      - `metrics`: now includes `proactiveReroutes: int`, `reactiveReroutes: int`, `avgStretch: float`.
+
+
+7. **Scenario Engine & Benchmark (Sync S3 / M5-M6 additions)**:
+   - `load_scenario`: `{"cmd": "load_scenario", "args": {"name": str}}` → resets engine, queues scenario events that fire at scheduled sim-times. Returns `[{"t": float, "level": "info", "kind": "scenario", "msg": str}]`.
+   - Scenario events emit `{"kind": "scenario"}` log entries as they fire.
+   - `active_scenario` state is cleared on `reset`.
+   - REST endpoints:
+     - `GET /api/scenarios` → `[{"name": str, "title": str, "description": str, "duration_s": float}]`
+     - `POST /api/scenarios/{name}/start` → `{"ok": bool, "scenario": str, "duration_s": float, "events_count": int}`
+     - `POST /api/benchmark` body `{"scenario"?: str, "seeds": int, "duration_s"?: float, "sim_dt"?: float}` → `{"scenario": str, "n_seeds": int, "aggregate": {...}, "per_seed": [...], "timeseries": [...]}`
+   - Benchmark aggregate structure: `aggregate.adaptive.latMs` / `pdr` / `throughput_mbps` / `reroutes` each have `{mean, std, min, max, p95}`.
+   - CLI: `python -m app.sim.benchmark --scenario solar_storm --seeds 10 --duration 300`

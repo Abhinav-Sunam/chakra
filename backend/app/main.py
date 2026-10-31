@@ -7,10 +7,10 @@ import copy
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import Any, Dict, Set
+from typing import Any, Dict, List, Set
 
-import orjson
 import numpy as np
+import orjson
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -18,6 +18,8 @@ from app.config import DEFAULT_CONFIG, SimConfig
 from app.schemas import parse_command
 from app.sim.engine import Engine
 from app.sim.orbit import ground_track, rephase_to, split_antimeridian
+from app.sim.scenarios import list_scenarios
+from app.sim.scenarios import load_scenario as load_scenario_def
 
 logger = logging.getLogger("satroute.main")
 logging.basicConfig(level=logging.INFO)
@@ -179,6 +181,45 @@ async def reset_simulation() -> Dict[str, bool]:
     # both run on the same event loop thread and step() is synchronous, so this is safe.
     engine.apply_command("reset", {})
     return {"ok": True}
+
+
+@app.get("/api/scenarios")
+async def get_scenarios() -> List[Dict[str, Any]]:
+    """Return list of available scenario definitions."""
+    return list_scenarios()
+
+
+@app.post("/api/scenarios/{name}/start")
+async def start_scenario(name: str) -> Dict[str, Any]:
+    """Load and start a named scenario, resetting the engine."""
+    global engine
+    scenario = load_scenario_def(name)
+    if scenario is None:
+        return {"ok": False, "error": f"Scenario not found: {name}"}
+    engine.apply_command("load_scenario", {"name": name})
+    return {"ok": True, "scenario": name, "duration_s": scenario.duration_s, "events_count": len(scenario.events)}
+
+
+@app.post("/api/benchmark")
+async def run_benchmark(body: Dict[str, Any]) -> Dict[str, Any]:
+    """Run headless benchmark with specified scenario and parameters.
+
+    Body: {"scenario"?: str, "seeds": int, "duration_s"?: float, "sim_dt"?: float}
+    Returns aggregated statistics across seeds.
+    """
+    from app.sim.benchmark import run_benchmark as _run_benchmark
+    scenario_name = body.get("scenario")
+    seeds = int(body.get("seeds", 5))
+    duration_s = float(body.get("duration_s", 300.0))
+    sim_dt = float(body.get("sim_dt", 2.0))
+
+    result = _run_benchmark(
+        scenario_name=scenario_name,
+        n_seeds=seeds,
+        duration_s=duration_s,
+        sim_dt=sim_dt,
+    )
+    return result
 
 
 @app.websocket("/ws")

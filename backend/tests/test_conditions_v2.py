@@ -1,7 +1,5 @@
 """Unit tests for Phase M3: Conditions v2 (Storm cells, eclipse derate, diurnal traffic, hotspots)."""
 
-import numpy as np
-import pytest
 
 from app.sim.engine import Engine
 from app.sim.traffic import diurnal_factor
@@ -12,7 +10,7 @@ def test_storm_weather_reduces_gsl_survival():
     engine = Engine(seed=42)
     # Find a ground station that currently has active GSL connections
     frame0 = engine.step(0.05)
-    gsl_links = [l for l in frame0["links"] if l["k"] == 1]
+    gsl_links = [lnk for lnk in frame0["links"] if lnk["k"] == 1]
     assert len(gsl_links) > 0, "Expected at least one active GSL link in frame"
 
     # Identify the station from the first GSL link (node id >= 120)
@@ -33,8 +31,8 @@ def test_storm_weather_reduces_gsl_survival():
     # Step frame
     frame1 = engine.step(0.05)
     updated_gsl = next(
-        l for l in frame1["links"]
-        if (l["a"] == target_link["a"] and l["b"] == target_link["b"])
+        lnk for lnk in frame1["links"]
+        if (lnk["a"] == target_link["a"] and lnk["b"] == target_link["b"])
     )
     loss1 = updated_gsl["loss"]
 

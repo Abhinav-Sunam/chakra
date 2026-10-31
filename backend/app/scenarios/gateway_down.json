@@ -1,0 +1,21 @@
+{
+  "name": "gateway_down",
+  "title": "New York Gateway Outage",
+  "description": "All ground-to-satellite links touching New York fail at t=60 for 3 minutes, forcing regional rerouting.",
+  "duration_s": 300,
+  "seed": 42,
+  "config_overrides": {},
+  "events": [
+    {
+      "t": 60.0,
+      "cmd": "fail_node",
+      "args": { "id": 122 }
+    },
+    {
+      "t": 240.0,
+      "cmd": "restore_node",
+      "args": { "id": 122 }
+    }
+  ]
+}
+

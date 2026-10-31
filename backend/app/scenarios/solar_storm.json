@@ -1,0 +1,31 @@
+{
+  "name": "solar_storm",
+  "title": "Solar Storm & EMP",
+  "description": "Failure intensity increases 10x for 5 min, solar storm knocks out satellites, and orbital plane 4 is completely lost at t=180.",
+  "duration_s": 360,
+  "seed": 42,
+  "config_overrides": {},
+  "events": [
+    {
+      "t": 30.0,
+      "cmd": "set_params",
+      "args": { "intensity": 10.0 }
+    },
+    {
+      "t": 60.0,
+      "cmd": "fail_region",
+      "args": { "lat": 15.0, "lon": 60.0, "radius_km": 3500.0 }
+    },
+    {
+      "t": 180.0,
+      "cmd": "fail_plane",
+      "args": { "plane": 4 }
+    },
+    {
+      "t": 330.0,
+      "cmd": "set_params",
+      "args": { "intensity": 1.0 }
+    }
+  ]
+}
+

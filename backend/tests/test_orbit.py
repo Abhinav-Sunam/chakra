@@ -1,11 +1,8 @@
 """Unit tests for orbital mechanics simulation module backend/app/sim/orbit.py."""
 
 import numpy as np
-import pytest
-
-from app.sim.constants import MU, OMEGA_E, R_EARTH
+from app.sim.constants import OMEGA_E
 from app.sim.orbit import (
-    Constellation,
     ecef_to_latlon,
     ground_track,
     latlon_to_ecef,

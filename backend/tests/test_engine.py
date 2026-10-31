@@ -1,12 +1,11 @@
 """Unit tests for the constellation simulation engine (backend/app/sim/engine.py)."""
 
 import json
-from typing import Any, Dict
+from typing import Any
+
 import numpy as np
 import pytest
-
 from app.sim.engine import Engine, run_headless
-from app.sim.orbit import ecef_to_latlon, positions_ecef
 
 try:
     import orjson

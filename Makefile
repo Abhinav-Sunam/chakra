@@ -15,3 +15,4 @@ lint:
 dev:
 	@echo "Starting backend and frontend in dev mode..."
 	bash scripts/dev.sh
+

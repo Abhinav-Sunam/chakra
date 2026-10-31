@@ -1,21 +1,17 @@
 """Unit tests for static and adaptive routing (backend/app/sim/routing/)."""
 
-from typing import Any, Dict, List, Tuple
 import math
 import time
+from typing import Any, Dict, Tuple
 
 import networkx as nx
 import numpy as np
-import pytest
-
-from app.sim.conditions import ConditionModel, FailParams, link_key
+from app.sim.conditions import ConditionModel, FailParams
 from app.sim.orbit import positions_ecef, walker_delta
 from app.sim.routing import (
     AdaptiveParams,
     AdaptiveRouter,
-    DEFAULT_WEIGHTS,
     StaticRouter,
-    link_cost,
 )
 from app.sim.topology import Topology, build_topology, default_ground_stations
 from app.sim.traffic import Flow, default_flows, evaluate

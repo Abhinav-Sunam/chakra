@@ -122,6 +122,9 @@ export interface OverallMetrics {
   static: Metrics;
   linkUptime: number;
   activeFailures: number;
+  proactiveReroutes?: number;
+  reactiveReroutes?: number;
+  avgStretch?: number;
 }
 
 export interface SimEvent {
@@ -209,7 +212,50 @@ export type CommandName =
   | 'add_storm'
   | 'move_storm'
   | 'remove_storm'
-  | 'set_hotspot';
+  | 'set_hotspot'
+  | 'load_scenario';
+
+export interface ScenarioMeta {
+  name: string;
+  title: string;
+  description: string;
+  duration_s: number;
+}
+
+export interface BenchmarkAggregateMetric {
+  mean: number;
+  std: number;
+  min: number;
+  max: number;
+  p95: number;
+}
+
+export interface BenchmarkResult {
+  scenario: string;
+  n_seeds: number;
+  duration_s: number;
+  sim_dt: number;
+  wall_time_s: number;
+  aggregate: {
+    adaptive: {
+      latMs: BenchmarkAggregateMetric;
+      pdr: BenchmarkAggregateMetric;
+      throughput_mbps: BenchmarkAggregateMetric;
+      reroutes: BenchmarkAggregateMetric;
+      proactive_reroutes: BenchmarkAggregateMetric;
+      reactive_reroutes: BenchmarkAggregateMetric;
+    };
+    static: {
+      latMs: BenchmarkAggregateMetric;
+      pdr: BenchmarkAggregateMetric;
+      throughput_mbps: BenchmarkAggregateMetric;
+    };
+    tick_ms_p95: BenchmarkAggregateMetric;
+    tick_ms_mean: BenchmarkAggregateMetric;
+  };
+  per_seed: Array<Record<string, any>>;
+  timeseries: Array<Record<string, any>>;
+}
 
 export interface ClientCommand {
   type: 'cmd';

@@ -197,7 +197,6 @@ PathChunk = PathOut
 OverallMetrics = MetricsBlock
 AckResponse = Ack
 ErrorResponse = ErrorMsg
-OrbitPreviewResponse = OrbitPreview
 
 
 # ---------------------------------------------------------------------------
@@ -480,6 +479,15 @@ class SetHotspotCmd(BaseCmd):
     args: SetHotspotArgs
 
 
+class LoadScenarioArgs(BaseModel):
+    name: str
+
+
+class LoadScenarioCmd(BaseCmd):
+    cmd: Literal["load_scenario"]
+    args: LoadScenarioArgs
+
+
 ClientCmd = Union[
     PlayCmd,
     PauseCmd,
@@ -507,6 +515,7 @@ ClientCmd = Union[
     MoveStormCmd,
     RemoveStormCmd,
     SetHotspotCmd,
+    LoadScenarioCmd,
 ]
 
 COMMAND_MODEL_MAP = {
@@ -536,6 +545,7 @@ COMMAND_MODEL_MAP = {
     "move_storm": MoveStormCmd,
     "remove_storm": RemoveStormCmd,
     "set_hotspot": SetHotspotCmd,
+    "load_scenario": LoadScenarioCmd,
 }
 
 

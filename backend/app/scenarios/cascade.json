@@ -1,0 +1,36 @@
+{
+  "name": "cascade",
+  "title": "Cascading Constellation Failure",
+  "description": "Accelerating random link failures across the constellation, followed by plane 2 failure and subsequent restoration.",
+  "duration_s": 360,
+  "seed": 42,
+  "config_overrides": {},
+  "events": [
+    {
+      "t": 30.0,
+      "cmd": "set_params",
+      "args": { "intensity": 5.0 }
+    },
+    {
+      "t": 90.0,
+      "cmd": "set_params",
+      "args": { "intensity": 15.0 }
+    },
+    {
+      "t": 150.0,
+      "cmd": "fail_plane",
+      "args": { "plane": 2 }
+    },
+    {
+      "t": 270.0,
+      "cmd": "restore_all",
+      "args": {}
+    },
+    {
+      "t": 270.0,
+      "cmd": "set_params",
+      "args": { "intensity": 1.0 }
+    }
+  ]
+}
+

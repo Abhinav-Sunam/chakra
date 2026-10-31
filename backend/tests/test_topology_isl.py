@@ -1,14 +1,11 @@
 """Unit tests for ISL topology construction backend/app/sim/topology.py."""
 
 import time
-import numpy as np
-import pytest
 
-from app.sim.constants import ISL_MAX_DEGREE, ISL_MAX_RANGE_KM
+import numpy as np
 from app.sim.orbit import positions_ecef, rephase_to, walker_delta
 from app.sim.topology import (
     TopoParams,
-    build_isl,
     build_topology,
     default_ground_stations,
 )
@@ -121,7 +118,7 @@ def test_5_average_isl_and_degree():
     n_sats = len(pos)
     avg_degree = (2.0 * isl_count) / n_sats
 
-    print(f"\nConstellation at t=0:")
+    print("\nConstellation at t=0:")
     print(f"  Total ISL count: {isl_count}")
     print(f"  Average satellite degree: {avg_degree:.2f}")
 

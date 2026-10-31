@@ -1,14 +1,9 @@
 """Unit tests for topology foundation module backend/app/sim/topology.py."""
 
 import numpy as np
-import pytest
-
 from app.sim.constants import R_EARTH
 from app.sim.orbit import latlon_to_ecef, positions_ecef, walker_delta
 from app.sim.topology import (
-    GroundStation,
-    TopoParams,
-    Topology,
     default_ground_stations,
     elevation_deg,
     los_clear,
