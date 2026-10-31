@@ -432,6 +432,54 @@ class RestoreAllCmd(BaseCmd):
     args: Optional[Dict[str, Any]] = None
 
 
+class AddStormArgs(BaseModel):
+    id: Optional[str] = None
+    lat: float
+    lon: float
+    radius_km: Optional[float] = 1000.0
+    intensity: Optional[float] = 1.0
+    vel_lat: Optional[float] = 0.0
+    vel_lon: Optional[float] = 0.0
+
+
+class AddStormCmd(BaseCmd):
+    cmd: Literal["add_storm"]
+    args: AddStormArgs
+
+
+class MoveStormArgs(BaseModel):
+    id: str
+    lat: float
+    lon: float
+    radius_km: Optional[float] = None
+    intensity: Optional[float] = None
+
+
+class MoveStormCmd(BaseCmd):
+    cmd: Literal["move_storm"]
+    args: MoveStormArgs
+
+
+class RemoveStormArgs(BaseModel):
+    id: str
+
+
+class RemoveStormCmd(BaseCmd):
+    cmd: Literal["remove_storm"]
+    args: RemoveStormArgs
+
+
+class SetHotspotArgs(BaseModel):
+    gs_id: int
+    factor: Optional[float] = 3.0
+    duration_s: Optional[float] = 180.0
+
+
+class SetHotspotCmd(BaseCmd):
+    cmd: Literal["set_hotspot"]
+    args: SetHotspotArgs
+
+
 ClientCmd = Union[
     PlayCmd,
     PauseCmd,
@@ -455,6 +503,10 @@ ClientCmd = Union[
     FailPlaneCmd,
     FailRegionCmd,
     RestoreAllCmd,
+    AddStormCmd,
+    MoveStormCmd,
+    RemoveStormCmd,
+    SetHotspotCmd,
 ]
 
 COMMAND_MODEL_MAP = {
@@ -480,6 +532,10 @@ COMMAND_MODEL_MAP = {
     "fail_plane": FailPlaneCmd,
     "fail_region": FailRegionCmd,
     "restore_all": RestoreAllCmd,
+    "add_storm": AddStormCmd,
+    "move_storm": MoveStormCmd,
+    "remove_storm": RemoveStormCmd,
+    "set_hotspot": SetHotspotCmd,
 }
 
 

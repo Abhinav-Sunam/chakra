@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from app.config import DEFAULT_CONFIG, SimConfig
-from app.sim.conditions import ConditionModel, FailParams, link_key
+from app.sim.conditions import ConditionModel, FailParams, Storm, link_key
 from app.sim.constants import MU, R_EARTH
 from app.sim.metrics import MetricsTracker, NetworkTracker
 from app.sim.orbit import (
@@ -34,7 +34,7 @@ from app.sim.topology import (
     default_ground_stations,
     link_ttl,
 )
-from app.sim.traffic import Flow, default_flows, evaluate
+from app.sim.traffic import Flow, default_flows, diurnal_factor, evaluate
 
 
 class Engine:
@@ -90,6 +90,10 @@ class Engine:
         # Track pinned sats {sat_id: ecef_coord} and removed sats set
         self.pinned_sats: Dict[int, np.ndarray] = {}
         self.removed_sats: Set[int] = set()
+
+        # Track hotspots {gs_id: (factor, expires_t)}
+        self.hotspots: Dict[int, Tuple[float, float]] = {}
+        self.diurnal_enabled: bool = bool(cfg.get("traffic_diurnal", sc.traffic.diurnal))
 
         # 4. Topology parameters
         self.topo_params = TopoParams(
@@ -223,6 +227,41 @@ class Engine:
             params=self.topo_params,
             future_dt_s=future_dt,
         )
+
+        # Update eclipse mask in condition model
+        r_eci = propagate_eci(self.constellation, self.t)
+        sh_mask = in_shadow(r_eci)
+        self.cond.eclipsed_sats = set(np.where(sh_mask)[0].tolist())
+
+        # Clean expired hotspots
+        self.hotspots = {
+            gs_id: (fact, exp_t)
+            for gs_id, (fact, exp_t) in self.hotspots.items()
+            if self.t < exp_t
+        }
+
+        # Update dynamic flow demands based on scale, diurnal cycle, and active hotspots
+        # Build ground station map by id
+        gs_by_id = {gs.id: gs for gs in self.ground}
+        for f in self.flows:
+            if f.id in self._base_mbps:
+                base = self._base_mbps[f.id]
+                demand = base * self.flow_scale
+                src_gs = gs_by_id.get(f.src)
+                if self.diurnal_enabled and src_gs:
+                    demand *= diurnal_factor(self.t, src_gs.lon)
+
+                # Hotspot check for source and destination ground stations
+                # Check station gs_id / id
+                multiplier = 1.0
+                for node_id in (f.src, f.dst):
+                    gs = gs_by_id.get(node_id)
+                    if gs:
+                        if gs.id in self.hotspots:
+                            multiplier = max(multiplier, self.hotspots[gs.id][0])
+                        if gs.gs_id in self.hotspots:
+                            multiplier = max(multiplier, self.hotspots[gs.gs_id][0])
+                f.mbps = demand * multiplier
 
         # Step dynamic condition failures and recoveries
         step_events = self.cond.step(topo, self.t, sim_dt)
@@ -415,6 +454,18 @@ class Engine:
             self.event_buffer.append(evt)
         self._was_partitioned = graph_partitioned
 
+        # Storms list for frame
+        storms_list = [
+            {
+                "id": st.id,
+                "lat": round(float(st.lat), 4),
+                "lon": round(float(st.lon), 4),
+                "radius_km": round(float(st.radius_km), 1),
+                "intensity": round(float(st.intensity), 2),
+            }
+            for st in self.cond.storms.values()
+        ]
+
         # 5. Events
         events_list = list(self.event_buffer)
         if clear_events:
@@ -428,6 +479,7 @@ class Engine:
             "tickMs": round(self.last_tick_ms, 2),
             "graph_partitioned": graph_partitioned,
             "isolated_stations": isolated_stations,
+            "storms": storms_list,
             "sats": sats_list,
             "links": links_list,
             "flows": flows_list,
@@ -642,6 +694,69 @@ class Engine:
             self._force_topo_rebuild = True
             self._force_adaptive = True
             return evts
+
+        elif cmd_lower == "add_storm":
+            s_id = str(args.get("id", f"storm_{len(self.cond.storms)+1}"))
+            lat = float(args["lat"])
+            lon = float(args["lon"])
+            radius_km = float(args.get("radius_km", 1000.0))
+            intensity = float(args.get("intensity", 1.0))
+            vel_lat = float(args.get("vel_lat", 0.0))
+            vel_lon = float(args.get("vel_lon", 0.0))
+            self.cond.storms[s_id] = Storm(
+                id=s_id,
+                lat=lat,
+                lon=lon,
+                radius_km=radius_km,
+                intensity=intensity,
+                vel_lat=vel_lat,
+                vel_lon=vel_lon,
+            )
+            evt = {
+                "t": self.t,
+                "level": "warn",
+                "kind": "storm",
+                "msg": f"Storm cell {s_id} developed at ({lat:.1f}, {lon:.1f}) radius {radius_km:.0f}km",
+            }
+            self.event_buffer.append(evt)
+            self.all_events.append(evt)
+            self._force_adaptive = True
+            return [evt]
+
+        elif cmd_lower == "move_storm":
+            s_id = str(args["id"])
+            if s_id in self.cond.storms:
+                self.cond.storms[s_id].lat = float(args["lat"])
+                self.cond.storms[s_id].lon = float(args["lon"])
+                if "radius_km" in args:
+                    self.cond.storms[s_id].radius_km = float(args["radius_km"])
+                if "intensity" in args:
+                    self.cond.storms[s_id].intensity = float(args["intensity"])
+            self._force_adaptive = True
+            return None
+
+        elif cmd_lower == "remove_storm":
+            s_id = str(args["id"])
+            if s_id in self.cond.storms:
+                del self.cond.storms[s_id]
+            self._force_adaptive = True
+            return None
+
+        elif cmd_lower == "set_hotspot":
+            gs_id = int(args["gs_id"])
+            factor = float(args.get("factor", 3.0))
+            duration_s = float(args.get("duration_s", 180.0))
+            self.hotspots[gs_id] = (factor, self.t + duration_s)
+            evt = {
+                "t": self.t,
+                "level": "warn",
+                "kind": "flash_crowd",
+                "msg": f"Flash crowd hotspot {factor}x on station {gs_id} for {duration_s:.0f}s",
+            }
+            self.event_buffer.append(evt)
+            self.all_events.append(evt)
+            self._force_adaptive = True
+            return [evt]
 
         elif cmd_lower == "move_sat":
             sat_id = int(args["id"])

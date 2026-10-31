@@ -16,6 +16,21 @@ from app.sim.topology import Topology
 Routes = Dict[str, List[Tuple[List[int], float]]]
 
 
+def diurnal_factor(t: float, src_lon: float) -> float:
+    """Diurnal demand variation factor based on local solar hour.
+
+    Local hour from station longitude and sim time t starting at 12:00 UTC:
+    diurnal = 0.7 + 0.3 * cos(2 * pi * (local_hour - 20) / 24).
+    Bounds in [0.4, 1.0].
+    """
+    import numpy as np
+    # Starting at 12:00 UTC (12.0 hours)
+    utc_hour = (12.0 + (t / 3600.0)) % 24.0
+    local_hour = (utc_hour + src_lon / 15.0) % 24.0
+    factor = 0.7 + 0.3 * np.cos(2.0 * np.pi * (local_hour - 20.0) / 24.0)
+    return float(np.clip(factor, 0.4, 1.0))
+
+
 @dataclass
 class Flow:
     """Traffic flow demand between source and destination nodes."""
@@ -211,7 +226,18 @@ def evaluate(
         link_load = load.get(k, 0.0)
         rho = link_load / capacity if capacity > 0 else 0.0
         ms_val = float(link_latency_ms(prop_ms_val, rho))
-        survive_val = float(survive(rho))
+
+        # Check weather attenuation for GSL links
+        p_weather = 0.0
+        if kind == 1 and hasattr(cond, "ground") and cond.ground:
+            # Locate ground station node in (u, v)
+            st_id = max(u, v)
+            for gs in cond.ground:
+                if getattr(gs, "id", None) == st_id:
+                    p_weather = cond.storm_weather_for_station(gs.lat, gs.lon)
+                    break
+
+        survive_val = float(survive(rho, weather=p_weather))
         loss_val = float(1.0 - survive_val)
         up_val = bool(cond.is_up(u, v, t))
 

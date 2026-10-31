@@ -205,7 +205,11 @@ export type CommandName =
   | 'pin_sat'
   | 'fail_plane'
   | 'fail_region'
-  | 'restore_all';
+  | 'restore_all'
+  | 'add_storm'
+  | 'move_storm'
+  | 'remove_storm'
+  | 'set_hotspot';
 
 export interface ClientCommand {
   type: 'cmd';

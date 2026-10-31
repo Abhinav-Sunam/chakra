@@ -68,6 +68,18 @@ class FailParams:
     detect_delay_s: float = 1.0
 
 
+@dataclass
+class Storm:
+    """Weather storm cell causing microwave GSL attenuation."""
+    id: str
+    lat: float
+    lon: float
+    radius_km: float
+    intensity: float = 1.0  # 0.0 to 1.0
+    vel_lat: float = 0.0    # deg/s drift
+    vel_lon: float = 0.0    # deg/s drift
+
+
 class ConditionModel:
     """Dynamic network failure and degradation condition model."""
 
@@ -90,6 +102,12 @@ class ConditionModel:
         self.failed_nodes: Set[int] = set()
         self.node_fail_seen_t: Dict[int, float] = {}
 
+        # Storm cells
+        self.storms: Dict[str, Storm] = {}
+        # Satellites in eclipse shadow set
+        self.eclipsed_sats: Set[int] = set()
+
+
     def step(self, topo: Topology, t: float, dt: float) -> List[Dict[str, Any]]:
         """Advance failure simulation by time step dt and return emitted events.
 
@@ -99,6 +117,11 @@ class ConditionModel:
            currently up, test stochastic failure with probability p = 1 - exp(-dt*intensity/mtbf_link_s).
         """
         events: List[Dict[str, Any]] = []
+
+        # Advance storm positions with velocity drift
+        for storm in self.storms.values():
+            storm.lat += storm.vel_lat * dt
+            storm.lon = ((storm.lon + storm.vel_lon * dt + 180.0) % 360.0) - 180.0
 
         # 1) Recoveries
         recovered_links: List[LinkId] = []
@@ -316,12 +339,42 @@ class ConditionModel:
         """Return number of currently failed nodes."""
         return len(self.failed_nodes)
 
+    def storm_weather_for_station(self, gs_lat: float, gs_lon: float) -> float:
+        """Calculate weather loss probability p_weather for a ground station across all active storms.
+
+        Per SPEC §7: p_weather = 0.15 * intensity * (1 - d / radius) when d <= radius.
+        Returns maximum p_weather across overlapping storms, capped at 1.0.
+        """
+        p_max = 0.0
+        for storm in self.storms.values():
+            dlat = np.radians(storm.lat - gs_lat)
+            dlon = np.radians(storm.lon - gs_lon)
+            lat1 = np.radians(gs_lat)
+            lat2 = np.radians(storm.lat)
+            a = np.sin(dlat / 2.0)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2.0)**2
+            c = 2.0 * np.arcsin(np.clip(np.sqrt(a), 0.0, 1.0))
+            d_km = 6371.0 * c
+
+            if d_km <= storm.radius_km and storm.radius_km > 0.0:
+                falloff = 1.0 - (d_km / storm.radius_km)
+                p_w = 0.15 * storm.intensity * falloff
+                if p_w > p_max:
+                    p_max = p_w
+
+        return float(min(1.0, max(0.0, p_max)))
+
     def link_props(self, topo: Topology, a: int, b: int) -> Dict[str, Any]:
         """Return link properties (dist_km, prop_ms, capacity_mbps, kind)."""
         k = link_key(a, b)
         is_isl = a < self.n_sats and b < self.n_sats
         kind = 0 if is_isl else 1
-        capacity_mbps = ISL_CAPACITY_MBPS if kind == 0 else GSL_CAPACITY_MBPS
+        base_capacity = ISL_CAPACITY_MBPS if kind == 0 else GSL_CAPACITY_MBPS
+
+        # Eclipse derating: ISL capacity x0.5 for links touching a satellite in shadow
+        if is_isl and (a in self.eclipsed_sats or b in self.eclipsed_sats):
+            capacity_mbps = base_capacity * 0.5
+        else:
+            capacity_mbps = base_capacity
 
         if k in topo.dist:
             dist_km = topo.dist[k]
@@ -353,12 +406,14 @@ class ConditionModel:
         t: float,
         rho: float = 0.0,
         weather: float = 0.0,
+        ttl: Optional[float] = None,
     ) -> float:
         """Calculate dynamic routing risk in [0, 1].
 
-        Formula: max(loss_term, recent_fail_term, 0.0)
-        where loss_term = clip((weather + cong_loss(rho)) * 10, 0, 1)
-        and recent_fail_term = 0.6 * 0.5**((t - last_fail_t)/60) if last_fail_t else 0.
+        Formula per SPEC §7 & §9:
+        - loss_term = clip((weather + cong_loss(rho)) * 10, 0, 1)
+        - recent_fail_term = 0.6 * 0.5**((t - last_fail_t)/60) if last_fail_t else 0.
+        - expiry_term: if link about to expire (ttl < 60 s), penalize: 1.0 - ttl/60.0.
         """
         loss_term = float(np.clip((weather + cong_loss(rho)) * 10.0, 0.0, 1.0))
         k = link_key(a, b)
@@ -368,7 +423,12 @@ class ConditionModel:
         else:
             recent_fail_term = 0.0
 
-        return float(max(loss_term, recent_fail_term, 0.0))
+        if ttl is not None and ttl < 60.0:
+            expiry_term = float(max(0.0, 1.0 - ttl / 60.0))
+        else:
+            expiry_term = 0.0
+
+        return float(max(loss_term, recent_fail_term, expiry_term, 0.0))
 
     def visible_down(self, a: int, b: int, t: float) -> bool:
         """Check if link failure is visible to routing protocol after detect_delay_s."""
