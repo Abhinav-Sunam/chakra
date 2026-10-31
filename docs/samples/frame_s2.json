@@ -1,0 +1,74 @@
+{
+  "type": "frame",
+  "t": 305.2,
+  "scale": 20.0,
+  "running": true,
+  "tickMs": 14.2,
+  "graph_partitioned": false,
+  "isolated_stations": [],
+  "storms": [
+    {
+      "id": "monsoon_sin",
+      "lat": 1.35,
+      "lon": 103.82,
+      "radius_km": 800.0,
+      "intensity": 0.9
+    }
+  ],
+  "flows": [
+    {
+      "id": "LAX-TYO",
+      "adaptive": {
+        "paths": [
+          {
+            "nodes": [129, 44, 45, 125],
+            "mbps": 400.0
+          }
+        ],
+        "ms": 48.5,
+        "pdr": 0.992,
+        "blackholed": false,
+        "explain": {
+          "chosen_cost": 52.3,
+          "alt_cost": 60.1,
+          "reason": "congestion",
+          "detail": "Avoided S014-S022 (utilisation 94%)"
+        }
+      },
+      "static": {
+        "paths": [
+          {
+            "nodes": [129, 14, 22, 125],
+            "mbps": 400.0
+          }
+        ],
+        "ms": 51.2,
+        "pdr": 0.884,
+        "blackholed": false
+      }
+    }
+  ],
+  "metrics": {
+    "adaptive": {
+      "latMs": 54.2,
+      "pdr": 0.985,
+      "thrMbps": 2850.0,
+      "reroutes": 12,
+      "rerouteRate": 0,
+      "recoverS": 1.8
+    },
+    "static": {
+      "latMs": 68.4,
+      "pdr": 0.812,
+      "thrMbps": 2310.0,
+      "reroutes": 4,
+      "rerouteRate": 0,
+      "recoverS": 42.0
+    },
+    "linkUptime": 99.85,
+    "activeFailures": 2,
+    "proactiveReroutes": 5,
+    "reactiveReroutes": 7,
+    "avgStretch": 1.05
+  }
+}

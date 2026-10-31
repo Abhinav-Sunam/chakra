@@ -72,7 +72,7 @@ def test_2_step_output_spec_keys():
     expected_subflow_keys = {"paths", "ms", "pdr", "blackholed"}
     for flow in frame["flows"]:
         assert set(flow.keys()) == expected_flow_keys
-        assert set(flow["adaptive"].keys()) == expected_subflow_keys
+        assert expected_subflow_keys.issubset(set(flow["adaptive"].keys()))
         assert set(flow["static"].keys()) == expected_subflow_keys
 
     # Links array
@@ -83,7 +83,7 @@ def test_2_step_output_spec_keys():
 
     # Metrics dictionary
     expected_metrics_keys = {"adaptive", "static", "linkUptime", "activeFailures"}
-    assert set(frame["metrics"].keys()) == expected_metrics_keys
+    assert expected_metrics_keys.issubset(set(frame["metrics"].keys()))
     expected_algo_metric_keys = {
         "latMs",
         "pdr",

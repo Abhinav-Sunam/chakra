@@ -272,9 +272,25 @@ class Engine:
         # Update routes for static and adaptive routers
         static_routes = self.static_router.update(topo, self.flows)
         adaptive_routes = self.adaptive_router.update(
-            topo, self.flows, self.t, force=self._force_adaptive
+            topo,
+            self.flows,
+            self.t,
+            force=self._force_adaptive,
+            link_ttls=self.link_ttl_cache,
         )
         self._force_adaptive = False
+
+        # Log non-init route changes
+        for f_id, exp in self.adaptive_router.explanations.items():
+            if exp["reason"] in ("prediction", "failure", "congestion"):
+                evt = {
+                    "t": self.t,
+                    "level": "info",
+                    "kind": "routing",
+                    "msg": f"Flow {f_id}: {exp['detail']}",
+                }
+                self.event_buffer.append(evt)
+                self.all_events.append(evt)
 
         # Evaluate performance for both routing solutions against current conditions
         self.eval_static = evaluate(
@@ -388,9 +404,25 @@ class Engine:
 
         # 3. Flows
         flows_list: List[Dict[str, Any]] = []
+        lat_adaptive_sum = 0.0
+        lat_static_sum = 0.0
+        active_flow_count = 0
+
         for f in self.flows:
             fe_a = self.eval_adaptive.flows.get(f.id)
             fe_s = self.eval_static.flows.get(f.id)
+            exp = self.adaptive_router.explanations.get(f.id, {
+                "chosen_cost": 0.0,
+                "alt_cost": 0.0,
+                "reason": "init",
+                "detail": "Initial route",
+            })
+
+            if fe_a and fe_s and not fe_a.blackholed and not fe_s.blackholed and fe_s.ms > 0:
+                lat_adaptive_sum += fe_a.ms
+                lat_static_sum += fe_s.ms
+                active_flow_count += 1
+
             flows_list.append({
                 "id": f.id,
                 "adaptive": {
@@ -401,6 +433,7 @@ class Engine:
                     "ms": round(float(fe_a.ms), 2) if fe_a else 0.0,
                     "pdr": round(float(fe_a.pdr), 4) if fe_a else 0.0,
                     "blackholed": fe_a.blackholed if fe_a else True,
+                    "explain": exp,
                 },
                 "static": {
                     "paths": [
@@ -413,6 +446,8 @@ class Engine:
                 },
             })
 
+        avg_stretch = (lat_adaptive_sum / lat_static_sum) if lat_static_sum > 0 else 1.0
+
         # 4. Metrics & network partition check
         net_snap = self.network_tracker.snapshot()
         metrics_dict = {
@@ -420,6 +455,9 @@ class Engine:
             "static": self.metrics_static.snapshot_frame(),
             "linkUptime": net_snap["linkUptime"],
             "activeFailures": net_snap["activeFailures"],
+            "proactiveReroutes": self.adaptive_router.proactive_reroutes,
+            "reactiveReroutes": self.adaptive_router.reactive_reroutes,
+            "avgStretch": round(float(avg_stretch), 3),
         }
 
         # Check ground station reachability (partition detection)
@@ -545,10 +583,19 @@ class Engine:
             return None
 
         elif cmd_lower == "set_weights":
-            a = float(args.get("a", 1.0))
-            b = float(args.get("b", 1.0))
-            c = float(args.get("c", 1.0))
-            self.adaptive_router.params.weights = (a, b, c)
+            preset = args.get("preset")
+            if preset == "latency-first":
+                weights = (2.0, 0.5, 0.5)
+            elif preset == "reliability-first":
+                weights = (0.5, 1.0, 2.0)
+            elif preset == "balanced":
+                weights = (1.0, 1.0, 1.0)
+            else:
+                a = float(args.get("a", 1.0))
+                b = float(args.get("b", 1.0))
+                c = float(args.get("c", 1.0))
+                weights = (a, b, c)
+            self.adaptive_router.params.weights = weights
             self._force_adaptive = True
             return None
 
@@ -793,6 +840,13 @@ class Engine:
         elif cmd_lower == "set_params":
             if "intensity" in args:
                 self.cond.params.intensity = float(args["intensity"])
+            if "chunks" in args:
+                self.adaptive_router.params.chunks = int(args["chunks"])
+            if "stickiness" in args:
+                self.adaptive_router.params.stickiness = float(args["stickiness"])
+            if "detect_delay_s" in args:
+                self.adaptive_router.params.detect_delay_s = float(args["detect_delay_s"])
+            self._force_adaptive = True
             return None
 
         elif cmd_lower == "add_flow":

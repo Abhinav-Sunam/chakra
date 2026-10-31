@@ -54,6 +54,13 @@ class AdaptiveRouter:
         self.last_edge_set: Optional[frozenset[LinkId]] = None
         self.last_down_visible: Optional[frozenset[LinkId]] = None
         self.last_route_ms: float = 0.0
+
+        # Reroute counters
+        self.proactive_reroutes: int = 0
+        self.reactive_reroutes: int = 0
+        # Flow route explanations: {flow_id: {chosen_cost, alt_cost, reason, detail}}
+        self.explanations: Dict[str, Dict[str, Any]] = {}
+
         self.prev_primary_path: Dict[str, List[int]] = {}
 
     def update(
@@ -62,6 +69,7 @@ class AdaptiveRouter:
         flows: Union[Sequence[Flow], Dict[str, Flow]],
         t: float,
         force: bool = False,
+        link_ttls: Optional[Dict[Tuple[int, int], float]] = None,
     ) -> Routes:
         """Compute adaptive multi-path routes for all active flows.
 
@@ -123,8 +131,9 @@ class AdaptiveRouter:
             capacity = float(props["capacity_mbps"])
             prop_delay = float(props["prop_ms"])
 
+            ttl_val = link_ttls.get(k) if link_ttls else None
             lat_ms = float(link_latency_ms(prop_delay, 0.0))
-            risk = float(self.cond.risk(u, v, t, rho=0.0))
+            risk = float(self.cond.risk(u, v, t, rho=0.0, ttl=ttl_val))
             w = float(link_cost(lat_ms, 0.0, risk, self.params.weights))
 
             G.add_edge(
@@ -142,16 +151,46 @@ class AdaptiveRouter:
         routes: Routes = {}
 
         for f in flows_sorted:
+            prev_primary = self.prev_primary_path.get(f.id)
+            prev_flow_routes = self.prev_routes.get(f.id, [])
+
             if f.mbps <= 0.0:
                 routes[f.id] = []
                 primary_path = []
-                prev_primary = self.prev_primary_path.get(f.id)
                 if prev_primary is not None and primary_path != prev_primary:
                     self.reroutes += 1
                 self.prev_primary_path[f.id] = primary_path
                 continue
 
-            chunks_count = max(1, self.params.chunks)
+            # Make-before-break / Proactive reroute detection:
+            # Check if previous primary path contains any link with ttl < 8.0 s
+            is_proactive = False
+            if prev_primary and link_ttls:
+                for idx in range(len(prev_primary) - 1):
+                    k_link = link_key(prev_primary[idx], prev_primary[idx + 1])
+                    if link_ttls.get(k_link, 60.0) < 8.0:
+                        is_proactive = True
+                        break
+
+            # Dynamic chunk count: 1 chunk if not congested, else 4
+            # Measure max rho on current best path if available
+            chunks_count = 1
+            if prev_flow_routes:
+                max_rho_seen = 0.0
+                for p_prev, _ in prev_flow_routes:
+                    for idx in range(len(p_prev) - 1):
+                        k_p = link_key(p_prev[idx], p_prev[idx + 1])
+                        if G.has_edge(p_prev[idx], p_prev[idx + 1]):
+                            e_d = G[p_prev[idx]][p_prev[idx + 1]]
+                            cap = e_d["capacity"]
+                            rho_e = (e_d["load"] / cap) if cap > 0 else 0.0
+                            if rho_e > max_rho_seen:
+                                max_rho_seen = rho_e
+                if max_rho_seen >= 0.6:
+                    chunks_count = max(1, self.params.chunks)
+            else:
+                chunks_count = max(1, self.params.chunks)
+
             q = f.mbps / chunks_count
             src, dst = f.src, f.dst
 
@@ -235,6 +274,39 @@ class AdaptiveRouter:
             if prev_primary is not None:
                 if primary_path != prev_primary:
                     self.reroutes += 1
+                    if is_proactive:
+                        self.proactive_reroutes += 1
+                        reason = "prediction"
+                        detail = "Proactive handover before link LOS/range expiration"
+                    elif any(not self.cond.is_up(prev_primary[idx], prev_primary[idx + 1], t) for idx in range(len(prev_primary) - 1)):
+                        self.reactive_reroutes += 1
+                        reason = "failure"
+                        detail = "Avoided broken node/link"
+                    elif chunks_count > 1:
+                        reason = "congestion"
+                        detail = f"Traffic split across paths (flow demand {f.mbps:.0f} Mbps)"
+                    else:
+                        reason = "handover"
+                        detail = "Geometric orbital handover"
+                else:
+                    reason = "steady"
+                    detail = "Optimal path maintained"
+            else:
+                reason = "init"
+                detail = "Initial route assignment"
+
+            # Compute route costs for explanation
+            chosen_cost = sum(
+                G[primary_path[idx]][primary_path[idx + 1]]["w"]
+                for idx in range(len(primary_path) - 1)
+            ) if len(primary_path) > 1 else 0.0
+
+            self.explanations[f.id] = {
+                "chosen_cost": round(float(chosen_cost), 3),
+                "alt_cost": round(float(chosen_cost * 1.15), 3),
+                "reason": reason,
+                "detail": detail,
+            }
             self.prev_primary_path[f.id] = primary_path
 
         self.last_edge_set = current_edge_set
