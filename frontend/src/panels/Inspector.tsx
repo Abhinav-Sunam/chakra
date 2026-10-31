@@ -74,6 +74,17 @@ export const Inspector: React.FC = () => {
               Fail Satellite (F)
             </button>
           )}
+
+          <button
+            onClick={() => sendCommand('pin_sat', { id: selection.id, pinned: sat?.st !== 3 })}
+            className={`py-1.5 px-3 rounded-lg border font-semibold transition text-center ${
+              sat?.st === 3
+                ? 'bg-warn text-bg border-warn'
+                : 'bg-white/5 border-border hover:bg-white/10 text-muted hover:text-text'
+            }`}
+          >
+            {sat?.st === 3 ? 'Unpin' : 'Pin Sat'}
+          </button>
         </div>
       </div>
     );

@@ -61,8 +61,8 @@ def run_single_seed(
     return {
         "seed": seed,
         "adaptive": {
-            "latMs_mean": adaptive_snap.get("latMs_mean", 0.0),
-            "pdr_mean": adaptive_snap.get("pdr_mean", 0.0),
+            "latMs_mean": adaptive_snap.get("cum_lat_ms", adaptive_snap.get("latMs", 0.0)),
+            "pdr_mean": adaptive_snap.get("cum_pdr", adaptive_snap.get("pdr", 0.0)),
             "throughput_mbps": (
                 engine.metrics_adaptive.cum_delivered_mb / duration_s
                 if duration_s > 0
@@ -74,8 +74,8 @@ def run_single_seed(
             "avg_stretch": adaptive_snap.get("avgStretch", 1.0),
         },
         "static": {
-            "latMs_mean": static_snap.get("latMs_mean", 0.0),
-            "pdr_mean": static_snap.get("pdr_mean", 0.0),
+            "latMs_mean": static_snap.get("cum_lat_ms", static_snap.get("latMs", 0.0)),
+            "pdr_mean": static_snap.get("cum_pdr", static_snap.get("pdr", 0.0)),
             "throughput_mbps": (
                 engine.metrics_static.cum_delivered_mb / duration_s
                 if duration_s > 0

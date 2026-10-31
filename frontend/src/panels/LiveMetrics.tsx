@@ -217,9 +217,26 @@ export const LiveMetrics: React.FC = () => {
             <div className="text-sm font-bold text-teal-bright tabular-nums font-mono">
               {adaptive.reroutes} <span className="text-[10px] text-muted">({adaptive.rerouteRate}/min)</span>
             </div>
-            <div className="text-[10px] text-muted mt-1">Static: 0 (Fixed)</div>
+            <div className="text-[10px] text-muted mt-1">
+              Proactive: {latestFrame.metrics.proactiveReroutes ?? 0} | Reactive: {latestFrame.metrics.reactiveReroutes ?? 0}
+            </div>
           </div>
         </div>
+
+        {/* Partition & Storm Warning Banner */}
+        {latestFrame.graph_partitioned && (
+          <div className="p-2.5 rounded-lg bg-crit/15 border border-crit/40 text-crit text-xs font-semibold flex items-center space-x-2">
+            <span className="w-2 h-2 rounded-full bg-crit animate-ping" />
+            <span>Network Partitioned ({latestFrame.isolated_stations?.length ?? 0} stations isolated)</span>
+          </div>
+        )}
+
+        {latestFrame.storms && latestFrame.storms.length > 0 && (
+          <div className="p-2 rounded-lg bg-orange/15 border border-orange/40 text-orange text-[11px] font-medium flex items-center justify-between">
+            <span>⛈️ Active Atmospheric Storm Cells</span>
+            <span className="font-mono font-bold">{latestFrame.storms.length} cell(s)</span>
+          </div>
+        )}
 
         {/* Metric 4: Link Uptime & Failures */}
         <div className="grid grid-cols-2 gap-2 text-xs">

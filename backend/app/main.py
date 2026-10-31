@@ -35,15 +35,22 @@ class ConnectionManager:
     def __init__(self) -> None:
         self.active_connections: Set[WebSocket] = set()
         self.consecutive_failures: Dict[WebSocket, int] = {}
+        self.roles: Dict[WebSocket, str] = {}
 
-    async def connect(self, websocket: WebSocket) -> None:
+    async def connect(self, websocket: WebSocket, role: str = "controller") -> None:
         await websocket.accept()
         self.active_connections.add(websocket)
         self.consecutive_failures[websocket] = 0
+        self.roles[websocket] = role
 
     def disconnect(self, websocket: WebSocket) -> None:
         self.active_connections.discard(websocket)
         self.consecutive_failures.pop(websocket, None)
+        self.roles.pop(websocket, None)
+
+    @property
+    def client_count(self) -> int:
+        return len(self.active_connections)
 
     async def broadcast_text(self, text: str) -> None:
         """Broadcast serialized frame text with per-client timeout guard."""
@@ -223,13 +230,14 @@ async def run_benchmark(body: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket) -> None:
+async def websocket_endpoint(websocket: WebSocket, role: str = "controller") -> None:
     """Live WebSocket stream for constellation simulation frames and control commands."""
-    await manager.connect(websocket)
+    await manager.connect(websocket, role=role)
 
     try:
         # Send initial static metadata frame
         init_data = engine.init_message()
+        init_data["client_count"] = manager.client_count
         init_text = orjson.dumps(init_data).decode("utf-8")
         await websocket.send_text(init_text)
 
@@ -244,6 +252,13 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 continue
 
             req_id = msg.get("id")
+
+            # Role guard: viewer cannot execute commands
+            if manager.roles.get(websocket) == "viewer" and msg.get("type") == "cmd":
+                err_resp = {"type": "error", "msg": "Client role 'viewer' is read-only", "id": req_id}
+                await websocket.send_text(orjson.dumps(err_resp).decode("utf-8"))
+                continue
+
             try:
                 parsed_cmd = parse_command(msg)
                 cmd_name = parsed_cmd.cmd

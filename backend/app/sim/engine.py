@@ -331,6 +331,22 @@ class Engine:
         self.tick_count += 1
         self.last_tick_ms = (time.perf_counter() - t_start) * 1000.0
 
+        # Tick guard (M7): auto-throttle routing cadence if engine struggles
+        if self.last_tick_ms > 90.0:
+            self._slow_tick_count = getattr(self, "_slow_tick_count", 0) + 1
+            if self._slow_tick_count >= 20:
+                self.adaptive_router.params.cadence_ticks = max(self.adaptive_router.params.cadence_ticks, 10)
+                evt = {
+                    "t": self.t,
+                    "level": "warn",
+                    "kind": "perf",
+                    "msg": "High tick latency (>90ms for 20 ticks): throttled routing cadence to 10 ticks",
+                }
+                self.event_buffer.append(evt)
+                self.all_events.append(evt)
+        else:
+            self._slow_tick_count = 0
+
     def step(self, dt_wall: float) -> Dict[str, Any]:
         """Advance simulation by dt_wall wall-clock seconds and return live frame dictionary."""
         if self.running:

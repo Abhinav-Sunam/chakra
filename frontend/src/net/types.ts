@@ -144,6 +144,14 @@ export interface InitMessage {
   planes: number[];
 }
 
+export interface StormState {
+  id: string;
+  lat: number;
+  lon: number;
+  radius_km: number;
+  intensity: number;
+}
+
 export interface FrameMessage {
   type: 'frame';
   t: number;
@@ -152,6 +160,7 @@ export interface FrameMessage {
   tickMs: number;
   graph_partitioned?: boolean;
   isolated_stations?: number[];
+  storms?: StormState[];
   sats: SatState[];
   links: LinkState[];
   flows: FlowPair[];

@@ -87,6 +87,31 @@ export const Controls: React.FC = () => {
               />
             </div>
 
+            {/* Preset Disaster Scenarios */}
+            <div className="space-y-1.5 pt-2 border-t border-border">
+              <span className="text-muted text-[10px] uppercase font-bold tracking-wider">
+                Disaster Scenarios
+              </span>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  { id: 'solar_storm', label: '☀️ Solar Storm' },
+                  { id: 'flash_crowd', label: '👥 Flash Crowd' },
+                  { id: 'monsoon_storm', label: '🌧️ Monsoon' },
+                  { id: 'gateway_down', label: '🏙️ Gateway Down' },
+                  { id: 'cascade', label: '💥 Cascade' },
+                  { id: 'calm_baseline', label: '🌿 Baseline' },
+                ].map((sc) => (
+                  <button
+                    key={sc.id}
+                    onClick={() => sendCommand('load_scenario', { name: sc.id })}
+                    className="px-2 py-1.5 text-[10px] rounded bg-white/5 hover:bg-teal-bright/20 border border-white/10 hover:border-teal-bright/40 text-left transition font-medium truncate"
+                  >
+                    {sc.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Quick Actions */}
             <div className="space-y-2 pt-2 border-t border-border">
               <span className="text-muted text-[10px] uppercase font-bold tracking-wider">
