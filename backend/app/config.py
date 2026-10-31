@@ -29,7 +29,7 @@ class GslConfig(BaseModel):
 
 
 class FailuresConfig(BaseModel):
-    mtbf_link_s: float = Field(default=60000.0, description="Mean time between link failures")
+    mtbf_link_s: float = Field(default=6000.0, description="Mean time between link failures")
     down_s: Tuple[float, float] = Field(default=(20.0, 90.0), description="Down duration range (min, max)")
     intensity: float = Field(default=1.0, description="Failure rate multiplier")
     detect_delay_s: float = Field(default=1.0, description="Detection delay in seconds")
