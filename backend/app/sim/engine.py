@@ -9,12 +9,15 @@ import numpy as np
 
 from app.config import DEFAULT_CONFIG, SimConfig
 from app.sim.conditions import ConditionModel, FailParams, link_key
+from app.sim.constants import MU, R_EARTH
 from app.sim.metrics import MetricsTracker, NetworkTracker
 from app.sim.orbit import (
     Constellation,
     ecef_to_latlon,
+    in_shadow,
     latlon_to_ecef,
     positions_ecef,
+    propagate_eci,
     rephase_to,
     walker_delta,
 )
@@ -82,6 +85,10 @@ class Engine:
         self.last_tick_ms: float = 0.0
         self._force_adaptive: bool = True
         self._force_topo_rebuild: bool = False
+
+        # Track pinned sats {sat_id: ecef_coord} and removed sats set
+        self.pinned_sats: Dict[int, np.ndarray] = {}
+        self.removed_sats: Set[int] = set()
 
         # 4. Topology parameters
         self.topo_params = TopoParams(
@@ -170,6 +177,14 @@ class Engine:
         )
         self.network_tracker.update(0.0, 0.0, self.prev_topo, self.cond)
 
+    def _get_sat_positions(self, t: float) -> np.ndarray:
+        """Compute satellite ECEF positions, respecting pinned satellites and constellation state."""
+        pos = positions_ecef(self.constellation, t)
+        for sat_id, fixed_pos in self.pinned_sats.items():
+            if 0 <= sat_id < len(pos):
+                pos[sat_id] = fixed_pos
+        return pos
+
     def tick(self, sim_dt: float) -> None:
         """Advance the simulation core by sim_dt seconds.
 
@@ -180,7 +195,7 @@ class Engine:
         self.t += sim_dt
 
         # Update satellite orbital positions
-        pos = positions_ecef(self.constellation, self.t)
+        pos = self._get_sat_positions(self.t)
         self.last_pos = pos
 
         # Rebuild network topology snapshot
@@ -253,11 +268,11 @@ class Engine:
         # 1. Satellite positions and velocities
         pos_t = getattr(self, "last_pos", None)
         if pos_t is None:
-            pos_t = positions_ecef(self.constellation, self.t)
+            pos_t = self._get_sat_positions(self.t)
         lat_t, lon_t, alt_t = ecef_to_latlon(pos_t)
 
         # Finite difference at t + 1.0 sim-second
-        pos_t1 = positions_ecef(self.constellation, self.t + 1.0)
+        pos_t1 = self._get_sat_positions(self.t + 1.0)
         lat_t1, lon_t1, _ = ecef_to_latlon(pos_t1)
 
         dlat = lat_t1 - lat_t
@@ -266,16 +281,31 @@ class Engine:
         vlat = dlat * self.time_scale
         vlon = dlon * self.time_scale
 
+        # Eclipse computation per satellite
+        r_eci = propagate_eci(self.constellation, self.t)
+        shadow_mask = in_shadow(r_eci)
+
         sats_list: List[Dict[str, Any]] = []
         for i in range(len(self.constellation)):
-            st = 1 if i in self.cond.failed_nodes else 0
+            if i in self.removed_sats:
+                continue
+
+            if i in self.cond.failed_nodes:
+                st = 1  # down
+            elif i in self.pinned_sats:
+                st = 3  # pinned
+            elif bool(shadow_mask[i]):
+                st = 2  # eclipse
+            else:
+                st = 0  # ok
+
             sats_list.append({
                 "id": i,
                 "lat": round(float(lat_t[i]), 4),
                 "lon": round(float(lon_t[i]), 4),
                 "alt": round(float(alt_t[i]), 4),
-                "vlat": round(float(vlat[i]), 4),
-                "vlon": round(float(vlon[i]), 4),
+                "vlat": 0.0 if i in self.pinned_sats else round(float(vlat[i]), 4),
+                "vlon": 0.0 if i in self.pinned_sats else round(float(vlon[i]), 4),
                 "st": st,
             })
 
@@ -453,6 +483,65 @@ class Engine:
                 self.all_events.append(evt)
             self._force_adaptive = True
             return [evt] if evt else []
+
+        elif cmd_lower == "add_sat":
+            lat = float(args.get("lat", 0.0))
+            lon = float(args.get("lon", 0.0))
+            inc_deg = float(args.get("inc_deg", 53.0))
+            alt_km = float(args.get("alt_km", 550.0))
+
+            orbit_radius = R_EARTH + alt_km
+            mean_motion = np.sqrt(MU / (orbit_radius**3))
+            inc_rad = np.radians(inc_deg)
+
+            # Append new satellite to constellation
+            new_sat_id = self.constellation.append_sat(
+                a_km=orbit_radius,
+                inc_rad=inc_rad,
+                raan_rad=0.0,
+                u0_rad=0.0,
+                n_rad_s=mean_motion,
+                plane_idx=-1,
+            )
+            # Rephase it to pass over (lat, lon) now
+            rephase_to(self.constellation, new_sat_id, lat, lon, self.t)
+
+            # Re-index ground station node ids to (N_current + g) while preserving gs_id
+            n_current = len(self.constellation)
+            for g_idx, gs in enumerate(self.ground):
+                gs.id = n_current + g_idx
+                gs.gs_id = g_idx
+
+            self._force_topo_rebuild = True
+            self._force_adaptive = True
+            return {"id": new_sat_id}
+
+        elif cmd_lower == "remove_sat":
+            sat_id = int(args["id"])
+            self.removed_sats.add(sat_id)
+            # Exclude from conditions / mark failed
+            self.cond.failed_nodes.add(sat_id)
+            self.pinned_sats.pop(sat_id, None)
+            self._force_topo_rebuild = True
+            self._force_adaptive = True
+            return None
+
+        elif cmd_lower == "pin_sat":
+            sat_id = int(args["id"])
+            pinned = bool(args.get("pinned", True))
+            if pinned:
+                # Freeze at current ECEF position
+                current_pos = self._get_sat_positions(self.t)[sat_id]
+                self.pinned_sats[sat_id] = current_pos.copy()
+            else:
+                # Unpin resumes via rephase_to at current position
+                if sat_id in self.pinned_sats:
+                    pos = self.pinned_sats.pop(sat_id)
+                    lat, lon, _ = ecef_to_latlon(pos)
+                    rephase_to(self.constellation, sat_id, float(lat), float(lon), self.t)
+            self._force_topo_rebuild = True
+            self._force_adaptive = True
+            return None
 
         elif cmd_lower == "move_sat":
             sat_id = int(args["id"])

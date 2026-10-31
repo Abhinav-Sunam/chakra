@@ -10,13 +10,14 @@ from contextlib import asynccontextmanager
 from typing import Any, Dict, Set
 
 import orjson
+import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import DEFAULT_CONFIG, SimConfig
 from app.schemas import parse_command
 from app.sim.engine import Engine
-from app.sim.orbit import ground_track, rephase_to
+from app.sim.orbit import ground_track, rephase_to, split_antimeridian
 
 logger = logging.getLogger("satroute.main")
 logging.basicConfig(level=logging.INFO)
@@ -212,7 +213,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 )
 
                 # Special command: preview_orbit
-                # reply {"type":"orbit_preview","id":id,"track":[[lon,lat],...]}
+                # reply {"type":"orbit_preview","id":id,"inc_deg":...,"period_s":...,"track":[[lon,lat],...],"segments":[[[lon,lat],...]]}
                 # using a COPY of the constellation (never modify the real one)
                 if cmd_name == "preview_orbit":
                     sat_id = int(args_dict.get("id", 0) if args_dict.get("id") is not None else 0)
@@ -221,15 +222,22 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
                     c_copy = copy.deepcopy(engine.constellation)
                     rephase_to(c_copy, sat_id, lat, lon, engine.t)
-                    # Compute 1 orbit ground track (e.g. 5400s / 90min, step 60s)
-                    raw_track = ground_track(c_copy, sat_id, engine.t, engine.t + 5400.0, 60.0)
+                    # Compute next 95 min ground track (30 s steps = 190 points)
+                    period_s = float(2.0 * 3.141592653589793 / c_copy.n[sat_id])
+                    inc_deg = float(np.degrees(c_copy.inc[sat_id]))
+                    duration_s = 95.0 * 60.0
+                    raw_track = ground_track(c_copy, sat_id, engine.t, engine.t + duration_s, 30.0)
                     # Output [[lon, lat], ...]
                     track_coords = [[round(p_lon, 4), round(p_lat, 4)] for p_lat, p_lon in raw_track]
+                    segments = split_antimeridian(track_coords)
 
                     resp = {
                         "type": "orbit_preview",
                         "id": sat_id,
+                        "inc_deg": round(inc_deg, 2),
+                        "period_s": round(period_s, 1),
                         "track": track_coords,
+                        "segments": segments,
                     }
                     await websocket.send_text(orjson.dumps(resp).decode("utf-8"))
 

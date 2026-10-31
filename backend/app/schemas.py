@@ -22,17 +22,42 @@ class SimConfig(BaseModel):
 class GroundOut(BaseModel):
     """Ground station description."""
     id: int
+    gs_id: Optional[int] = None
     name: str
     lat: float
     lon: float
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.gs_id is None:
+            self.gs_id = self.id
+
+
+# Alias for backward compatibility
+GroundStation = GroundOut
 
 
 class FlowDef(BaseModel):
     """Flow definition."""
     id: str
-    src: int
-    dst: int
+    src: Optional[int] = None
+    dst: Optional[int] = None
+    src_gs: Optional[int] = None
+    dst_gs: Optional[int] = None
     mbps: float
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.src is None and self.src_gs is not None:
+            self.src = self.src_gs
+        elif self.src_gs is None and self.src is not None:
+            self.src_gs = self.src
+        if self.dst is None and self.dst_gs is not None:
+            self.dst = self.dst_gs
+        elif self.dst_gs is None and self.dst is not None:
+            self.dst_gs = self.dst
+
+
+# Alias for backward compatibility
+Flow = FlowDef
 
 
 class Init(BaseModel):
@@ -160,6 +185,19 @@ class OrbitPreview(BaseModel):
     id: Optional[int] = None
     track: Optional[List[List[float]]] = None
     points: Optional[List[Dict[str, float]]] = None
+
+
+# Aliases for backward compatibility
+InitMessage = Init
+FrameMessage = Frame
+SatState = SatOut
+LinkState = LinkOut
+FlowPair = FlowFrame
+PathChunk = PathOut
+OverallMetrics = MetricsBlock
+AckResponse = Ack
+ErrorResponse = ErrorMsg
+OrbitPreviewResponse = OrbitPreview
 
 
 # ---------------------------------------------------------------------------
@@ -327,6 +365,46 @@ class RemoveFlowCmd(BaseCmd):
     args: RemoveFlowArgs
 
 
+class AddSatArgs(BaseModel):
+    lat: float
+    lon: float
+    inc_deg: Optional[float] = 53.0
+    alt_km: Optional[float] = 550.0
+
+
+class AddSatCmd(BaseCmd):
+    cmd: Literal["add_sat"]
+    args: AddSatArgs
+
+
+class RemoveSatArgs(BaseModel):
+    id: int
+
+
+class RemoveSatCmd(BaseCmd):
+    cmd: Literal["remove_sat"]
+    args: RemoveSatArgs
+
+
+class PinSatArgs(BaseModel):
+    id: int
+    pinned: bool
+
+
+class PinSatCmd(BaseCmd):
+    cmd: Literal["pin_sat"]
+    args: PinSatArgs
+
+
+class OrbitPreviewResponse(BaseModel):
+    type: Literal["orbit_preview"] = "orbit_preview"
+    id: int
+    inc_deg: float
+    period_s: float
+    track: List[List[float]]  # Flat list of [lon, lat] or segmented
+    segments: Optional[List[List[List[float]]]] = None
+
+
 ClientCmd = Union[
     PlayCmd,
     PauseCmd,
@@ -344,6 +422,9 @@ ClientCmd = Union[
     SetFlowScaleCmd,
     AddFlowCmd,
     RemoveFlowCmd,
+    AddSatCmd,
+    RemoveSatCmd,
+    PinSatCmd,
 ]
 
 COMMAND_MODEL_MAP = {
@@ -363,6 +444,9 @@ COMMAND_MODEL_MAP = {
     "set_flow_scale": SetFlowScaleCmd,
     "add_flow": AddFlowCmd,
     "remove_flow": RemoveFlowCmd,
+    "add_sat": AddSatCmd,
+    "remove_sat": RemoveSatCmd,
+    "pin_sat": PinSatCmd,
 }
 
 

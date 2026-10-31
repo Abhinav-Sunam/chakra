@@ -11,15 +11,16 @@ v1 contract frozen
    - `LinkOut.up` model specifies `int` (1 / 0).
 
 3. **Satellite status (`sats[].st`)**:
-   - Represented as integer `0` (operational) or `1` (failed node) in `Engine.step()` output.
-   - `SatOut.st` model specifies `int` (0 / 1).
+   - Represented as integer `0` (operational), `1` (failed node), `2` (eclipse shadow), `3` (pinned / manual).
+   - `SatOut.st` model specifies `int` (0, 1, 2, 3).
 
 4. **Flow structure (`flows[]`)**:
    - Each entry has `id: str`, `adaptive: FlowEval`, and `static: FlowEval`.
    - Each `FlowEval` contains `paths` (list of `{"nodes": list[int], "mbps": float}`), `ms: float`, `pdr: float`, and `blackholed: bool`.
 
-5. **Client Commands & Responses**:
+5. **Client Commands & Responses (Sync S1 / M1 additions)**:
    - Command models extend `BaseCmd` supporting optional request tracking `id` and `type` tag.
-   - All client commands (`play`, `pause`, `reset`, `set_scale`, `set_weights`, `set_params`, `fail_link`, `restore_link`, `fail_sat`, `restore_sat`, `move_sat`, `move_gs`, `preview_orbit`, `set_flow_scale`, `add_flow`, `remove_flow`) are strictly validated using `parse_command()`.
-   - `preview_orbit` command response produces `{"type": "orbit_preview", "id": id, "track": [[lon, lat], ...]}`.
-   - Acknowledgment and error message models (`Ack`, `ErrorMsg`) allow both `id` and descriptive messages (`msg` or `error`).
+   - `add_sat`: `{"cmd": "add_sat", "args": {"lat": float, "lon": float, "inc_deg"?: float, "alt_km"?: float}}` -> creates satellite, rephases to (lat, lon), re-indexes ground station ids (N_current + g), keeps stable `gs_id`.
+   - `remove_sat`: `{"cmd": "remove_sat", "args": {"id": int}}` -> marks removed while preserving array indexing.
+   - `pin_sat`: `{"cmd": "pin_sat", "args": {"id": int, "pinned": bool}}` -> freezes satellite ECEF position across ticks (`st=3`). Unpin rephases at current position.
+   - `preview_orbit`: `{"cmd": "preview_orbit", "args": {"id"?: int, "lat"?: float, "lon"?: float}}` -> returns `{"type": "orbit_preview", "id": int, "inc_deg": float, "period_s": float, "track": [[lon, lat], ...], "segments": [[[lon, lat], ...]]}`.

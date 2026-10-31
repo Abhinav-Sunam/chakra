@@ -33,6 +33,7 @@ class GroundStation:
     lat: float
     lon: float
     ecef: np.ndarray
+    gs_id: int = 0
 
 
 @dataclass
@@ -94,6 +95,7 @@ def default_ground_stations(n_sats: int = 120) -> List[GroundStation]:
                 lat=lat,
                 lon=lon,
                 ecef=ecef,
+                gs_id=idx,
             )
         )
     return stations

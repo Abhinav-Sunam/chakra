@@ -70,6 +70,24 @@ class Constellation:
         """Total number of satellites."""
         return len(self.a)
 
+    def append_sat(
+        self,
+        a_km: float,
+        inc_rad: float,
+        raan_rad: float,
+        u0_rad: float,
+        n_rad_s: float,
+        plane_idx: int = -1,
+    ) -> int:
+        """Append a new satellite to the constellation and return its new index."""
+        self.a = np.append(self.a, a_km)
+        self.inc = np.append(self.inc, inc_rad)
+        self.raan = np.append(self.raan, raan_rad)
+        self.u0 = np.append(self.u0, u0_rad)
+        self.n = np.append(self.n, n_rad_s)
+        self.plane_index = np.append(self.plane_index, plane_idx)
+        return len(self.a) - 1
+
     def __len__(self) -> int:
         return len(self.a)
 
@@ -440,3 +458,54 @@ def ground_track(
     lon_deg = np.degrees(np.arctan2(y_ecef, x_ecef))
 
     return list(zip(lat_deg.tolist(), lon_deg.tolist()))
+
+
+def in_shadow(r_eci: np.ndarray) -> np.ndarray:
+    """Determine eclipse state for satellites using cylindrical shadow model along +x_eci.
+
+    Per SPEC §7:
+    Sun direction is along +x_eci.
+    A satellite is eclipsed (in shadow) iff:
+    r_eci_x < 0 and sqrt(r_eci_y^2 + r_eci_z^2) <= R_EARTH.
+
+    Args:
+        r_eci: ECI position array of shape (N, 3) or (3,)
+
+    Returns:
+        Boolean numpy array of shape (N,) or bool.
+    """
+    r = np.asarray(r_eci)
+    if r.ndim == 1:
+        x, y, z = r[0], r[1], r[2]
+        return bool(x < 0.0 and (y * y + z * z) <= R_EARTH * R_EARTH)
+    x = r[:, 0]
+    y = r[:, 1]
+    z = r[:, 2]
+    return (x < 0.0) & ((y * y + z * z) <= (R_EARTH * R_EARTH))
+
+
+def split_antimeridian(track: List[List[float]]) -> List[List[List[float]]]:
+    """Split ground track coordinates [[lon, lat], ...] at the antimeridian (+/-180) into segments."""
+    if not track:
+        return []
+
+    segments: List[List[List[float]]] = []
+    current_segment: List[List[float]] = [track[0]]
+
+    for i in range(1, len(track)):
+        prev_pt = track[i - 1]
+        curr_pt = track[i]
+        dlon = curr_pt[0] - prev_pt[0]
+
+        # Crossing antimeridian if jump > 180 degrees
+        if abs(dlon) > 180.0:
+            segments.append(current_segment)
+            current_segment = [curr_pt]
+        else:
+            current_segment.append(curr_pt)
+
+    if current_segment:
+        segments.append(current_segment)
+
+    return segments
+

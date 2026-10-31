@@ -57,6 +57,7 @@ export interface SimConfig {
 
 export interface GroundStation {
   id: number;
+  gs_id?: number;
   name: string;
   lat: number;
   lon: number;
@@ -166,7 +167,10 @@ export interface ErrorResponse {
 export interface OrbitPreviewResponse {
   type: 'orbit_preview';
   id: number;
+  inc_deg?: number;
+  period_s?: number;
   track: [number, number][];
+  segments?: [number, number][][];
 }
 
 export type ServerMessage =
@@ -193,7 +197,10 @@ export type CommandName =
   | 'preview_orbit'
   | 'set_flow_scale'
   | 'add_flow'
-  | 'remove_flow';
+  | 'remove_flow'
+  | 'add_sat'
+  | 'remove_sat'
+  | 'pin_sat';
 
 export interface ClientCommand {
   type: 'cmd';
