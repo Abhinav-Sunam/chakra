@@ -5,7 +5,8 @@ import { CheckCircle2, AlertTriangle, AlertOctagon, Info } from 'lucide-react';
 export const FooterBar: React.FC = () => {
   const { latestFrame, fps } = useSimStore();
   const activeFailures = latestFrame?.metrics.activeFailures ?? 0;
-  const pdr = latestFrame?.metrics.adaptive.pdr ?? 1.0;
+  const rawPdr = latestFrame?.metrics.adaptive.pdr ?? 1.0;
+  const pdr = rawPdr > 1.0 ? rawPdr / 100.0 : rawPdr;
   const events = latestFrame?.events ?? [];
 
   const isNominal = activeFailures === 0 && pdr >= 0.95;

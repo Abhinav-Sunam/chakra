@@ -24,13 +24,16 @@ export const LiveMetrics: React.FC = () => {
     if (latestFrame.t === lastTimeRef.current) return;
     lastTimeRef.current = latestFrame.t;
 
+    // Handle PDR whether backend sends [0, 1] fraction or [0, 100] percentage
+    const normPdr = (val: number) => (val > 1.0 ? Math.min(val, 100) : Math.min(val * 100, 100));
+
     setHistory((prev) => {
       const point: MetricHistoryPoint = {
         t: latestFrame.t,
         latAdaptive: latestFrame.metrics.adaptive.latMs,
         latStatic: latestFrame.metrics.static.latMs,
-        pdrAdaptive: latestFrame.metrics.adaptive.pdr * 100,
-        pdrStatic: latestFrame.metrics.static.pdr * 100,
+        pdrAdaptive: normPdr(latestFrame.metrics.adaptive.pdr),
+        pdrStatic: normPdr(latestFrame.metrics.static.pdr),
         thrAdaptive: latestFrame.metrics.adaptive.thrMbps / 1000,
         thrStatic: latestFrame.metrics.static.thrMbps / 1000,
       };
@@ -54,8 +57,15 @@ export const LiveMetrics: React.FC = () => {
 
   // Latency delta (% improvement of adaptive over static)
   const latDelta = stat.latMs > 0 ? ((stat.latMs - adaptive.latMs) / stat.latMs) * 100 : 0;
-  // PDR delta
-  const pdrDelta = (adaptive.pdr - stat.pdr) * 100;
+  // Helper to normalize PDR to 0-100% display safely
+  const formatPdrDisplay = (val: number) => {
+    const pct = val > 1.0 ? Math.min(val, 100) : Math.min(val * 100, 100);
+    return pct.toFixed(1);
+  };
+
+  const pdrValAdaptive = adaptive.pdr > 1.0 ? adaptive.pdr : adaptive.pdr * 100;
+  const pdrValStatic = stat.pdr > 1.0 ? stat.pdr : stat.pdr * 100;
+  const pdrDelta = pdrValAdaptive - pdrValStatic;
 
   return (
     <aside className="w-84 bg-panel border-l border-border flex flex-col select-none overflow-y-auto shrink-0 z-10">
@@ -152,10 +162,10 @@ export const LiveMetrics: React.FC = () => {
               <div>
                 <span
                   className={`text-xl font-bold tabular-nums font-mono ${
-                    adaptive.pdr >= 0.95 ? 'text-ok' : adaptive.pdr >= 0.8 ? 'text-warn' : 'text-crit'
+                    pdrValAdaptive >= 95 ? 'text-ok' : pdrValAdaptive >= 80 ? 'text-warn' : 'text-crit'
                   }`}
                 >
-                  {(adaptive.pdr * 100).toFixed(1)}%
+                  {formatPdrDisplay(adaptive.pdr)}%
                 </span>
                 <span className="text-xs text-muted ml-1">(Adap)</span>
               </div>
@@ -164,10 +174,10 @@ export const LiveMetrics: React.FC = () => {
               <div>
                 <span
                   className={`text-xl font-bold tabular-nums font-mono ${
-                    stat.pdr >= 0.95 ? 'text-ok' : stat.pdr >= 0.8 ? 'text-warn' : 'text-crit'
+                    pdrValStatic >= 95 ? 'text-ok' : pdrValStatic >= 80 ? 'text-warn' : 'text-crit'
                   }`}
                 >
-                  {(stat.pdr * 100).toFixed(1)}%
+                  {formatPdrDisplay(stat.pdr)}%
                 </span>
                 <span className="text-xs text-muted ml-1">(Stat)</span>
               </div>

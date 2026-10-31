@@ -22,7 +22,7 @@ class IslConfig(BaseModel):
 
 
 class GslConfig(BaseModel):
-    el_min_deg: float = Field(default=25.0, description="Min ground elevation angle in degrees")
+    el_min_deg: float = Field(default=10.0, description="Min ground elevation angle in degrees")
     drop_margin_deg: float = Field(default=2.0, description="Drop margin in degrees")
     k: int = Field(default=3, description="Max simultaneous GSL links per ground station")
     capacity_mbps: float = Field(default=1000.0, description="GSL link capacity in Mbps")
