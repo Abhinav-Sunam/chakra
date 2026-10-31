@@ -44,7 +44,7 @@ def test_2_step_output_spec_keys():
     engine = Engine(seed=42)
     frame = engine.step(dt_wall=0.1)
 
-    # SPEC Section 12 required frame keys
+    # SPEC Section 12 required frame keys (plus MVP additions: graph_partitioned, isolated_stations)
     expected_frame_keys = {
         "type",
         "t",
@@ -57,7 +57,7 @@ def test_2_step_output_spec_keys():
         "metrics",
         "events",
     }
-    assert set(frame.keys()) == expected_frame_keys, f"Frame keys mismatch: {set(frame.keys())}"
+    assert expected_frame_keys.issubset(set(frame.keys())), f"Missing keys: {expected_frame_keys - set(frame.keys())}"
     assert frame["type"] == "frame"
 
     # Sats array

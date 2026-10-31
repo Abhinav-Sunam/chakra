@@ -27,3 +27,4 @@ This audit evaluates the integrated codebase (Prototype P0-P7 from Person 1 and 
 3. **M3 (Conditions v2)**: Moving storm cells with GSL weather attenuation, eclipse capacity derating (0.5x), and diurnal traffic demand curves.
 4. **M4 (Routing v2)**: Predictive make-before-break rerouting using link TTL, dynamic splitting, and route explainability (`flows[i].adaptive.explain`).
 5. **M5 & M6 (Scenarios & Benchmarking)**: 6 pre-built disaster scenarios and multi-seed Monte Carlo headless benchmarking suite.
+

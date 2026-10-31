@@ -405,6 +405,33 @@ class OrbitPreviewResponse(BaseModel):
     segments: Optional[List[List[List[float]]]] = None
 
 
+class FailPlaneArgs(BaseModel):
+    plane: int
+    duration: Optional[float] = None
+
+
+class FailPlaneCmd(BaseCmd):
+    cmd: Literal["fail_plane"]
+    args: FailPlaneArgs
+
+
+class FailRegionArgs(BaseModel):
+    lat: float
+    lon: float
+    radius_km: Optional[float] = 2000.0
+    duration: Optional[float] = None
+
+
+class FailRegionCmd(BaseCmd):
+    cmd: Literal["fail_region"]
+    args: FailRegionArgs
+
+
+class RestoreAllCmd(BaseCmd):
+    cmd: Literal["restore_all"]
+    args: Optional[Dict[str, Any]] = None
+
+
 ClientCmd = Union[
     PlayCmd,
     PauseCmd,
@@ -425,6 +452,9 @@ ClientCmd = Union[
     AddSatCmd,
     RemoveSatCmd,
     PinSatCmd,
+    FailPlaneCmd,
+    FailRegionCmd,
+    RestoreAllCmd,
 ]
 
 COMMAND_MODEL_MAP = {
@@ -447,6 +477,9 @@ COMMAND_MODEL_MAP = {
     "add_sat": AddSatCmd,
     "remove_sat": RemoveSatCmd,
     "pin_sat": PinSatCmd,
+    "fail_plane": FailPlaneCmd,
+    "fail_region": FailRegionCmd,
+    "restore_all": RestoreAllCmd,
 }
 
 

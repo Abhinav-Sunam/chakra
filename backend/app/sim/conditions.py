@@ -224,12 +224,78 @@ class ConditionModel:
             "msg": f"Node {name} restored",
         }
 
-    def restore_all(self, t: float) -> None:
+    def fail_plane(
+        self,
+        plane_idx: int,
+        plane_indices: np.ndarray,
+        t: float,
+        duration: Optional[float] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fail all satellites belonging to a specific orbital plane."""
+        sats_in_plane = [i for i, p in enumerate(plane_indices) if p == plane_idx]
+        events = []
+        for sat_id in sats_in_plane:
+            self.failed_nodes.add(sat_id)
+            self.node_fail_seen_t[sat_id] = t
+
+        evt = {
+            "t": t,
+            "level": "crit",
+            "kind": "plane_fail",
+            "msg": f"Plane {plane_idx} lost — {len(sats_in_plane)} satellites offline",
+        }
+        events.append(evt)
+        return events
+
+    def fail_region(
+        self,
+        target_lat: float,
+        target_lon: float,
+        radius_km: float,
+        sat_lats: np.ndarray,
+        sat_lons: np.ndarray,
+        t: float,
+        duration: Optional[float] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fail all satellites currently inside a geographic circle of radius_km."""
+        # Great circle / spherical distance from target (lat, lon)
+        dlat = np.radians(sat_lats - target_lat)
+        dlon = np.radians(sat_lons - target_lon)
+        lat1 = np.radians(target_lat)
+        lat2 = np.radians(sat_lats)
+
+        a = np.sin(dlat / 2.0)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2.0)**2
+        c = 2.0 * np.arcsin(np.clip(np.sqrt(a), 0.0, 1.0))
+        dist_km = 6371.0 * c
+
+        sats_in_region = np.where(dist_km <= radius_km)[0].tolist()
+
+        for sat_id in sats_in_region:
+            self.failed_nodes.add(sat_id)
+            self.node_fail_seen_t[sat_id] = t
+
+        evt = {
+            "t": t,
+            "level": "crit",
+            "kind": "region_fail",
+            "msg": f"Solar/debris event at ({target_lat:.1f}, {target_lon:.1f}) — {len(sats_in_region)} satellites offline",
+        }
+        return [evt]
+
+    def restore_all(self, t: float) -> List[Dict[str, Any]]:
         """Clear all active link and node failures."""
+        count_nodes = len(self.failed_nodes)
+        count_links = len(self.down_until)
         self.down_until.clear()
         self.failed_nodes.clear()
         self.fail_seen_t.clear()
         self.node_fail_seen_t.clear()
+        return [{
+            "t": t,
+            "level": "info",
+            "kind": "restore_all",
+            "msg": f"All failures restored ({count_nodes} satellites, {count_links} links)",
+        }]
 
     def is_up(self, a: int, b: int, t: float) -> bool:
         """Return True if link (a, b) is operational at time t."""

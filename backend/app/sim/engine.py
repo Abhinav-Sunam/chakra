@@ -32,6 +32,7 @@ from app.sim.topology import (
     TopoParams,
     build_topology,
     default_ground_stations,
+    link_ttl,
 )
 from app.sim.traffic import Flow, default_flows, evaluate
 
@@ -206,6 +207,23 @@ class Engine:
         self.prev_topo = topo
         self._force_topo_rebuild = False
 
+        # Compute future forward positions and link TTL cache (cached once per tick)
+        future_dt = 5.0
+        n_future_steps = 12
+        pos_future_list = [
+            self._get_sat_positions(self.t + (k + 1) * future_dt)
+            for k in range(n_future_steps)
+        ]
+        all_candidate_links = topo.isl + topo.gsl
+        self.link_ttl_cache = link_ttl(
+            pos_now=pos,
+            pos_future_list=pos_future_list,
+            links=all_candidate_links,
+            ground=self.ground,
+            params=self.topo_params,
+            future_dt_s=future_dt,
+        )
+
         # Step dynamic condition failures and recoveries
         step_events = self.cond.step(topo, self.t, sim_dt)
         if step_events:
@@ -356,7 +374,7 @@ class Engine:
                 },
             })
 
-        # 4. Metrics
+        # 4. Metrics & network partition check
         net_snap = self.network_tracker.snapshot()
         metrics_dict = {
             "adaptive": self.metrics_adaptive.snapshot_frame(),
@@ -364,6 +382,38 @@ class Engine:
             "linkUptime": net_snap["linkUptime"],
             "activeFailures": net_snap["activeFailures"],
         }
+
+        # Check ground station reachability (partition detection)
+        import networkx as nx
+        active_graph = nx.Graph()
+        for gs in self.ground:
+            active_graph.add_node(gs.id)
+
+        for u, v in topo.isl + topo.gsl:
+            if self.cond.is_up(u, v, self.t):
+                active_graph.add_edge(u, v)
+
+        isolated_stations: List[int] = []
+        station_ids = [gs.id for gs in self.ground]
+        for s_id in station_ids:
+            # Check if this station is connected to any other station
+            if not any(
+                nx.has_path(active_graph, s_id, other_id)
+                for other_id in station_ids
+                if other_id != s_id
+            ):
+                isolated_stations.append(s_id)
+
+        graph_partitioned = len(isolated_stations) > 0
+        if graph_partitioned and not getattr(self, "_was_partitioned", False):
+            evt = {
+                "t": self.t,
+                "level": "crit",
+                "kind": "partition",
+                "msg": f"Network partitioned: {len(isolated_stations)} ground stations isolated",
+            }
+            self.event_buffer.append(evt)
+        self._was_partitioned = graph_partitioned
 
         # 5. Events
         events_list = list(self.event_buffer)
@@ -376,6 +426,8 @@ class Engine:
             "scale": self.time_scale,
             "running": self.running,
             "tickMs": round(self.last_tick_ms, 2),
+            "graph_partitioned": graph_partitioned,
+            "isolated_stations": isolated_stations,
             "sats": sats_list,
             "links": links_list,
             "flows": flows_list,
@@ -542,6 +594,54 @@ class Engine:
             self._force_topo_rebuild = True
             self._force_adaptive = True
             return None
+
+        elif cmd_lower == "restore_all":
+            evts = self.cond.restore_all(self.t)
+            self.event_buffer.extend(evts)
+            self.all_events.extend(evts)
+            self._force_topo_rebuild = True
+            self._force_adaptive = True
+            return evts
+
+        elif cmd_lower == "fail_plane":
+            plane_idx = int(args["plane"])
+            duration = float(args["duration"]) if "duration" in args else None
+            evts = self.cond.fail_plane(
+                plane_idx,
+                self.constellation.plane_index,
+                self.t,
+                duration=duration,
+            )
+            self.event_buffer.extend(evts)
+            self.all_events.extend(evts)
+            self._force_topo_rebuild = True
+            self._force_adaptive = True
+            return evts
+
+        elif cmd_lower == "fail_region":
+            lat = float(args["lat"])
+            lon = float(args["lon"])
+            radius_km = float(args.get("radius_km", 2000.0))
+            duration = float(args["duration"]) if "duration" in args else None
+
+            # Get current satellite latitudes and longitudes
+            pos = self._get_sat_positions(self.t)
+            sat_lats, sat_lons, _ = ecef_to_latlon(pos)
+
+            evts = self.cond.fail_region(
+                target_lat=lat,
+                target_lon=lon,
+                radius_km=radius_km,
+                sat_lats=sat_lats,
+                sat_lons=sat_lons,
+                t=self.t,
+                duration=duration,
+            )
+            self.event_buffer.extend(evts)
+            self.all_events.extend(evts)
+            self._force_topo_rebuild = True
+            self._force_adaptive = True
+            return evts
 
         elif cmd_lower == "move_sat":
             sat_id = int(args["id"])

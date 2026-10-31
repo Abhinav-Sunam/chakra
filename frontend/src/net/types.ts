@@ -147,6 +147,8 @@ export interface FrameMessage {
   scale: number;
   running: boolean;
   tickMs: number;
+  graph_partitioned?: boolean;
+  isolated_stations?: number[];
   sats: SatState[];
   links: LinkState[];
   flows: FlowPair[];
@@ -200,7 +202,10 @@ export type CommandName =
   | 'remove_flow'
   | 'add_sat'
   | 'remove_sat'
-  | 'pin_sat';
+  | 'pin_sat'
+  | 'fail_plane'
+  | 'fail_region'
+  | 'restore_all';
 
 export interface ClientCommand {
   type: 'cmd';

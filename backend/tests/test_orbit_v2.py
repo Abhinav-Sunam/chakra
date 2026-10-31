@@ -103,3 +103,4 @@ def test_tle_parsing_and_propagation():
     radii = np.linalg.norm(pos, axis=-1)
     for r in radii:
         assert 6700.0 <= r <= 7200.0
+

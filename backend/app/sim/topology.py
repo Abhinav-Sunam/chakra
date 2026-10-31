@@ -466,3 +466,70 @@ def build_topology(
         dist=dist,
     )
 
+
+def link_ttl(
+    pos_now: np.ndarray,
+    pos_future_list: List[np.ndarray],
+    links: List[Tuple[int, int]],
+    ground: Optional[List[GroundStation]] = None,
+    params: Optional[TopoParams] = None,
+    future_dt_s: float = 5.0,
+) -> Dict[Tuple[int, int], float]:
+    """Compute link time-to-live (seconds until link breaks) across future positions.
+
+    Evaluates forward positions at +5s..+60s (e.g. 12 steps).
+    For an ISL: invalid if distance > isl_max_range_km or LOS blocked by Earth.
+    For a GSL: invalid if elevation < (el_min_deg - drop_margin_deg).
+
+    Returns:
+        dict mapping (u, v) link_key to seconds-until-invalid (float). Max 60.0.
+    """
+    if params is None:
+        params = TopoParams()
+
+    n_sats = len(pos_now)
+    ttls: Dict[Tuple[int, int], float] = {}
+
+    if not links:
+        return ttls
+
+    # Station coordinates map
+    station_map: Dict[int, np.ndarray] = {gs.id: gs.ecef for gs in ground} if ground else {}
+    drop_threshold = params.el_min_deg - params.gsl_drop_margin_deg
+
+    n_steps = len(pos_future_list)
+
+    for u, v in links:
+        key = (u, v) if u < v else (v, u)
+        is_isl = u < n_sats and v < n_sats
+
+        valid_until = float(n_steps * future_dt_s)
+
+        for step_idx, pos_future in enumerate(pos_future_list):
+            dt_future = (step_idx + 1) * future_dt_s
+
+            if is_isl:
+                # Check distance and LOS
+                p_u = pos_future[u]
+                p_v = pos_future[v]
+                dist = np.linalg.norm(p_u - p_v)
+                if dist > params.isl_max_range_km or not los_clear(p_u, p_v, params.atmos_km):
+                    valid_until = dt_future
+                    break
+            else:
+                # GSL link: one is sat, other is station
+                sat_id = min(u, v)
+                st_id = max(u, v)
+                if st_id in station_map and sat_id < len(pos_future):
+                    p_sat = pos_future[sat_id]
+                    p_st = station_map[st_id]
+                    el = elevation_deg(p_st, p_sat)
+                    if el < drop_threshold:
+                        valid_until = dt_future
+                        break
+
+        ttls[key] = valid_until
+
+    return ttls
+
+
