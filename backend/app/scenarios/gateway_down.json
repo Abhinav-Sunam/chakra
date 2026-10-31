@@ -7,13 +7,13 @@
   "config_overrides": {},
   "events": [
     {
-      "t": 60.0,
-      "cmd": "fail_node",
+      "t": 5.0,
+      "cmd": "fail_sat",
       "args": { "id": 122 }
     },
     {
       "t": 240.0,
-      "cmd": "restore_node",
+      "cmd": "restore_sat",
       "args": { "id": 122 }
     }
   ]

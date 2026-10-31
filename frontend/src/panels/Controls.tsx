@@ -9,7 +9,12 @@ export const Controls: React.FC = () => {
   const [flowScale, setFlowScale] = useState(1.0);
   const [speed, setSpeed] = useState(20);
 
-  const running = latestFrame?.running ?? true;
+  const [activeScenario, setActiveScenario] = useState<string | null>(null);
+
+  const handleRunScenario = (scId: string) => {
+    setActiveScenario(scId);
+    sendCommand('load_scenario', { name: scId });
+  };
 
   const handleWeightChange = (key: 'a' | 'b' | 'c', val: number) => {
     const next = { ...weights, [key]: val };
@@ -30,6 +35,24 @@ export const Controls: React.FC = () => {
 
   const handleBreakActiveLink = () => {
     if (!latestFrame) return;
+    const { ui } = useSimStore.getState();
+    const selFlow = latestFrame.flows.find((f) => f.id === ui.selectedFlowId);
+    
+    // First priority: Break an ISL on the currently selected/visible flow path so user immediately sees the reroute!
+    if (selFlow && selFlow.adaptive.paths.length > 0) {
+      for (const chunk of selFlow.adaptive.paths) {
+        for (let i = 0; i < chunk.nodes.length - 1; i++) {
+          const u = chunk.nodes[i];
+          const v = chunk.nodes[i + 1];
+          if (u < 120 && v < 120) {
+            sendCommand('fail_link', { a: u, b: v });
+            return;
+          }
+        }
+      }
+    }
+
+    // Fallback: Break any random active ISL
     const upLinks = latestFrame.links.filter((l) => l.up === 1 && l.k === 0);
     if (upLinks.length > 0) {
       const target = upLinks[Math.floor(Math.random() * upLinks.length)];
@@ -39,6 +62,21 @@ export const Controls: React.FC = () => {
 
   const handleBreakSatellite = () => {
     if (!latestFrame) return;
+    const { ui } = useSimStore.getState();
+    const selFlow = latestFrame.flows.find((f) => f.id === ui.selectedFlowId);
+
+    // Priority: Break a satellite that is directly on the active path
+    if (selFlow && selFlow.adaptive.paths.length > 0) {
+      for (const chunk of selFlow.adaptive.paths) {
+        const pathSats = chunk.nodes.filter((n) => n < 120);
+        if (pathSats.length > 0) {
+          const targetId = pathSats[Math.floor(Math.random() * pathSats.length)];
+          sendCommand('fail_sat', { id: targetId });
+          return;
+        }
+      }
+    }
+
     const upSats = latestFrame.sats.filter((s) => s.st === 0);
     if (upSats.length > 0) {
       const target = upSats[Math.floor(Math.random() * upSats.length)];
@@ -47,7 +85,7 @@ export const Controls: React.FC = () => {
   };
 
   const handleRestoreAll = () => {
-    sendCommand('reset');
+    sendCommand('restore_all');
   };
 
   return (
@@ -100,15 +138,22 @@ export const Controls: React.FC = () => {
                   { id: 'gateway_down', label: '🏙️ Gateway Down' },
                   { id: 'cascade', label: '💥 Cascade' },
                   { id: 'calm_baseline', label: '🌿 Baseline' },
-                ].map((sc) => (
-                  <button
-                    key={sc.id}
-                    onClick={() => sendCommand('load_scenario', { name: sc.id })}
-                    className="px-2 py-1.5 text-[10px] rounded bg-white/5 hover:bg-teal-bright/20 border border-white/10 hover:border-teal-bright/40 text-left transition font-medium truncate"
-                  >
-                    {sc.label}
-                  </button>
-                ))}
+                ].map((sc) => {
+                  const isActive = activeScenario === sc.id;
+                  return (
+                    <button
+                      key={sc.id}
+                      onClick={() => handleRunScenario(sc.id)}
+                      className={`px-2 py-1.5 text-[10px] rounded border text-left transition font-medium truncate ${
+                        isActive
+                          ? 'bg-teal-bright text-bg border-teal-bright shadow-sm font-bold'
+                          : 'bg-white/5 hover:bg-teal-bright/20 border-white/10 hover:border-teal-bright/40 text-text'
+                      }`}
+                    >
+                      {sc.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

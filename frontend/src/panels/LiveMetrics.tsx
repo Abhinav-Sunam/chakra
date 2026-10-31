@@ -253,7 +253,7 @@ export const LiveMetrics: React.FC = () => {
           <div className="bg-panel2/60 rounded-xl p-3 border border-border">
             <div className="text-muted text-[10px] uppercase font-semibold mb-1">Link Uptime</div>
             <div className="text-sm font-bold text-text tabular-nums font-mono">
-              {(linkUptime * 100).toFixed(1)}%
+              {(linkUptime > 1.0 ? linkUptime : linkUptime * 100).toFixed(1)}%
             </div>
             <div className="text-[10px] text-muted mt-1">Physical network</div>
           </div>

@@ -7,26 +7,26 @@
   "config_overrides": {},
   "events": [
     {
-      "t": 20.0,
+      "t": 5.0,
       "cmd": "add_storm",
       "args": {
         "id": "singapore_monsoon",
         "lat": 1.35,
         "lon": 103.82,
-        "radius_km": 1200.0,
-        "intensity": 0.95,
+        "radius_km": 1500.0,
+        "intensity": 3.0,
         "vel_lon": 0.05
       }
     },
     {
-      "t": 30.0,
+      "t": 10.0,
       "cmd": "add_storm",
       "args": {
         "id": "delhi_monsoon",
         "lat": 28.61,
         "lon": 77.21,
-        "radius_km": 1000.0,
-        "intensity": 0.9,
+        "radius_km": 1500.0,
+        "intensity": 3.0,
         "vel_lon": 0.04
       }
     }

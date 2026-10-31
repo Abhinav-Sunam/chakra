@@ -7,17 +7,17 @@
   "config_overrides": {},
   "events": [
     {
+      "t": 5.0,
+      "cmd": "set_params",
+      "args": { "intensity": 10.0 }
+    },
+    {
       "t": 30.0,
       "cmd": "set_params",
-      "args": { "intensity": 5.0 }
+      "args": { "intensity": 25.0 }
     },
     {
-      "t": 90.0,
-      "cmd": "set_params",
-      "args": { "intensity": 15.0 }
-    },
-    {
-      "t": 150.0,
+      "t": 60.0,
       "cmd": "fail_plane",
       "args": { "plane": 2 }
     },

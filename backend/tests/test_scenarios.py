@@ -27,8 +27,8 @@ class TestScenarioLoading:
         assert sc.title == "Solar Storm & EMP"
         assert sc.duration_s == 360
         assert len(sc.events) == 4
-        # First event at t=30
-        assert sc.events[0].t == 30.0
+        # First event at t=5.0
+        assert sc.events[0].t == 5.0
         assert sc.events[0].cmd == "set_params"
 
     def test_load_scenario_not_found(self) -> None:
